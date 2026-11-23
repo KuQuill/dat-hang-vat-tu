@@ -70,6 +70,8 @@ Phòng vật tư thêm nhóm / nhóm con trong *Kho & tài sản → 🗂 Nhóm 
 
 ## Trạng thái hiện tại
 
+- 🌐 **Web app**: https://kuquill.github.io/dat-hang-vat-tu/ — tự cập nhật mỗi khi push thay đổi trong `app/` lên nhánh `main`.
+
 - Đã tạo project Supabase **dat-hang-vat-tu** (Singapore, gói miễn phí), đã chạy toàn bộ SQL, đã triển khai Edge Function `admin-users`.
 - `app/js/config.js` đã trỏ tới project này.
 - Có 2 công trường thử nghiệm (TEST01, TEST02), 4 tài khoản thử nghiệm và 1 PR mẫu (PR-2026-0001).
