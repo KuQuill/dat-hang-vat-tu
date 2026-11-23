@@ -64,6 +64,13 @@ Phòng vật tư chuyển đợt sang "Đang giao" ──► Công trường b�
 - Người đặt hoặc quản lý thu hồi / sửa được. Người đặt huỷ được PR khi chờ duyệt / đã thu hồi / bị từ chối (PR đã duyệt: thu hồi trước rồi huỷ);
   quản lý huỷ được PR chưa có hàng đi đường (đến *Đã đặt hàng*); quản trị huỷ được đến trước khi nhận đủ.
 
+### Đặt hàng cho xưởng nội thất (1 PR cho nhiều dự án)
+- Ở màn hình **Dự án**, khai báo xưởng (vd mã `XNT`) và tick **🏭 Là xưởng sản xuất**.
+- Ở Sheet 1 chọn xưởng → màn hình Đặt hàng có thêm cột **Dùng cho dự án**: mỗi dòng bấm **＋ Chọn dự án** để chia số lượng cho một hoặc nhiều dự án
+  (vd 100 tấm MDF = SSD 60 · TTN 30). Phần chưa chia là **dự phòng xưởng**. Dán từ Excel: cột thứ 6 ghi `SSD:60; TTN:30`.
+- Hàng giao và nhập kho về xưởng như PR thường. Ở Theo dõi, PR xưởng có nhãn **🏭 Cho SSD, TTN**; lọc theo dự án SSD sẽ thấy cả PR của xưởng có phần cho SSD;
+  file Excel xuất ra có cột *Dùng cho dự án*; phiếu PDF có cột chia và dòng tổng hợp các dự án.
+
 ### Xuất PDF để ký
 Ở màn hình Theo dõi (hoặc ngay sau khi gửi PR) bấm **⬇ Xuất PDF** → tải file `SỐ-PR.pdf`: phiếu đề nghị cấp vật tư A4 gồm thông tin PR, bảng vật tư và 2 ô ký (Người đặt hàng · Chỉ huy trưởng) để ký và gửi lên nhóm.
 
@@ -105,7 +112,7 @@ Phòng vật tư thêm nhóm / nhóm con trong *Kho & tài sản → 🗂 Nhóm 
 ## Bước 1 — Tạo Supabase
 
 1. https://supabase.com → **New project** → Region **Southeast Asia (Singapore)**.
-2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql`, `004_roles_manager.sql` (thư mục `supabase/migrations/`).
+2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql`, `004_roles_manager.sql`, `005_workshop_alloc.sql` (thư mục `supabase/migrations/`).
 3. Thêm công trường:
    ```sql
    insert into public.sites (code, name, address, manager) values

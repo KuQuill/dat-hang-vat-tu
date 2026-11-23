@@ -68,6 +68,20 @@ export function DemoBackend() {
     db.counters[k] = (db.counters[k] || 0) + 1;
     return `${code}.${cat}.PR${String(db.counters[k]).padStart(2, '0')}`;
   }
+  function parseAlloc(pr, line, qty, alloc) {
+    if (!Array.isArray(alloc) || !alloc.length) return null;
+    const ws = db.sites.find(s => s.id === pr.site_id);
+    if (!ws || !ws.is_workshop) fail(`Dòng ${line}: chỉ PR của xưởng mới chia số lượng cho dự án`);
+    const map = new Map(); let sum = 0;
+    for (const a of alloc) {
+      const q = Number(a.qty); if (!q) continue; if (q < 0) fail(`Dòng ${line}: số lượng chia phải lớn hơn 0`);
+      const s = db.sites.find(x => (a.site_id ? x.id === a.site_id : x.code.toUpperCase() === String(a.site || '').trim().toUpperCase()) && x.active !== false && !x.is_workshop);
+      if (!s) fail(`Dòng ${line}: dự án "${a.site || a.site_id}" không tồn tại hoặc đã ngừng`);
+      map.set(s.id, (map.get(s.id) || 0) + q); sum += q;
+    }
+    if (sum > qty + 1e-9) fail(`Dòng ${line}: tổng chia cho các dự án (${sum}) vượt số lượng đặt (${qty})`);
+    return map.size ? [...map].map(([site_id, q]) => ({ site_id, qty: q })) : null;
+  }
   function insertItems(u, pr, items, via) {
     if (!Array.isArray(items) || !items.length) fail('Đơn hàng chưa có dòng vật tư nào');
     return items.map((it, i) => {
@@ -77,7 +91,8 @@ export function DemoBackend() {
       else if (it.code) m = { ...(db.materials.find(x => x.code.toUpperCase() === it.code.toUpperCase()) || fail(`Dòng ${i + 1}: không có mã ${it.code}`)), created: false };
       else m = findOrCreate(u, it, via);
       const unit = (it.unit || '').trim() || m.unit;
-      db.items.push({ id: uid(), pr_id: pr.id, line_no: i + 1, material_id: m.id, qty, unit, note: it.note || null, supplier: null, po_no: null, eta: null, received_date: null, qty_received: 0, status: 'cho_xu_ly', updated_at: now() });
+      const alloc = parseAlloc(pr, i + 1, qty, it.alloc);
+      db.items.push({ id: uid(), pr_id: pr.id, line_no: i + 1, material_id: m.id, qty, unit, note: it.note || null, alloc, supplier: null, po_no: null, eta: null, received_date: null, qty_received: 0, status: 'cho_xu_ly', updated_at: now() });
       return { line: i + 1, id: m.id, code: m.code, name: m.name, unit, qty, created: m.created, input_name: it.name || null };
     });
   }
@@ -216,7 +231,7 @@ export function DemoBackend() {
 
   /* ---------- Dữ liệu mẫu ---------- */
   function seed() {
-    db = { v: 5, workCats: [['CB', 'Công tác chuẩn bị, lán trại, tạm', 10], ['XD', 'Xây dựng – kết cấu', 20], ['MEP', 'Cơ điện (M&E)', 30], ['PCCC', 'Phòng cháy chữa cháy', 40], ['HT', 'Hoàn thiện', 50], ['NT', 'Nội thất', 60], ['HTKT', 'Hạ tầng kỹ thuật', 70], ['CQ', 'Cảnh quan', 80], ['TB', 'Thiết bị', 90], ['K', 'Khác', 999]].map(([code, name, sort]) => ({ code, name, sort, active: true })), sites: [], groups: [], subgroups: [], materials: [], profiles: [], stock: [], stockLog: [], assets: [], assetHistory: [],
+    db = { v: 6, workCats: [['CB', 'Công tác chuẩn bị, lán trại, tạm', 10], ['XD', 'Xây dựng – kết cấu', 20], ['MEP', 'Cơ điện (M&E)', 30], ['PCCC', 'Phòng cháy chữa cháy', 40], ['HT', 'Hoàn thiện', 50], ['NT', 'Nội thất', 60], ['HTKT', 'Hạ tầng kỹ thuật', 70], ['CQ', 'Cảnh quan', 80], ['TB', 'Thiết bị', 90], ['K', 'Khác', 999]].map(([code, name, sort]) => ({ code, name, sort, active: true })), sites: [], groups: [], subgroups: [], materials: [], profiles: [], stock: [], stockLog: [], assets: [], assetHistory: [],
            prs: [], items: [], deliveries: [], atts: [], blobs: {}, proposals: [], lines: [], links: [], counters: {}, history: [] };
     const t = todayISO();
     db.groups = GROUPS.map(([code, name, kind, track_site, keywords, priority]) => ({ code, name, kind, track_site, keywords, priority, seq: 0, active: true }));
@@ -225,6 +240,7 @@ export function DemoBackend() {
       { id: 's1', code: 'LA01', name: 'Nhà xưởng Long An', address: 'KCN Tân Đức, Đức Hòa, Long An', manager: 'Phạm Văn Hùng', active: true },
       { id: 's2', code: 'BD02', name: 'Kho lạnh Bình Dương', address: 'KCN VSIP II, Thủ Dầu Một', manager: 'Võ Thanh Tâm', active: true },
       { id: 's3', code: 'HCM03', name: 'Văn phòng Quận 7', address: 'Nguyễn Lương Bằng, Q.7, TP.HCM', manager: 'Đỗ Minh Khang', active: true },
+      { id: 's4', code: 'XNT', name: 'Xưởng nội thất', address: 'Xưởng sản xuất nội thất', manager: 'Trưởng xưởng', active: true, is_workshop: true },
     ];
     db.profiles = [
       { id: 'u1', email: 'site@demo.vn', full_name: 'Nguyễn Văn An', phone: '0901 111 222', role: 'site', site_id: 's1', active: true },
@@ -306,7 +322,7 @@ export function DemoBackend() {
   }
 
   db = LS.get(KEY.demodb);
-  if (!db || db.v !== 5) db = seed();
+  if (!db || db.v !== 6) db = seed();
   const save = () => { if (!LS.set(KEY.demodb, db)) toast('Bộ nhớ demo trên máy đã đầy — hãy tạo lại dữ liệu demo', 'err'); };
   save();
   const clone = x => JSON.parse(JSON.stringify(x));
@@ -393,7 +409,11 @@ export function DemoBackend() {
       let x = st.id && db.sites.find(y => y.id === st.id);
       if (st.id && !x) fail('Không tìm thấy dự án');
       if (x && x.code !== code && db.prs.some(p => p.site_id === x.id)) fail('Dự án đã có PR, không đổi được mã (mã nằm trong số PR)');
-      const vals = { code, name: st.name.trim(), address: (st.address || '').trim() || null, manager: (st.manager || '').trim() || null, active: st.active !== false };
+      if (x && !!x.is_workshop !== !!st.is_workshop) {
+        if (!st.is_workshop && db.items.some(i => i.alloc && db.prs.some(p => p.id === i.pr_id && p.site_id === x.id && p.status !== 'huy'))) fail('Xưởng đã có PR chia theo dự án — không bỏ đánh dấu xưởng được');
+        if (st.is_workshop && db.items.some(i => (i.alloc || []).some(a => a.site_id === x.id) && db.prs.some(p => p.id === i.pr_id && p.status !== 'huy'))) fail('Dự án này đang được xưởng đặt hàng cho — không chuyển thành xưởng được');
+      }
+      const vals = { code, name: st.name.trim(), address: (st.address || '').trim() || null, manager: (st.manager || '').trim() || null, active: st.active !== false, is_workshop: !!st.is_workshop };
       if (x) Object.assign(x, vals); else { x = { id: uid(), ...vals }; db.sites.push(x); }
       return x.id;
     }),

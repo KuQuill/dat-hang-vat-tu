@@ -195,3 +195,13 @@ fieldset.issues label.disabled{opacity:.5;cursor:not-allowed}
 .login-brand img{width:92px;height:92px}
 .login-brand .co{font-weight:800;font-size:20px;color:var(--primary);letter-spacing:.3px}
 .login-brand .app{font-size:13px;color:var(--muted)}
+
+/* v2.5 — xưởng nội thất: chia số lượng cho dự án */
+.order-table .c-alloc{min-width:170px}
+.alloc-btn{max-width:260px;white-space:normal;text-align:left;justify-content:flex-start;line-height:1.3}
+.ws-note{background:var(--primary-soft);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px}
+.mt-s{margin-top:4px}
+.alloc-line{color:var(--accent);margin-top:2px}
+.alloc-table td{padding:5px 8px}
+.f.chk{display:flex;flex-direction:row;align-items:center;gap:8px}
+.f.chk input{width:auto}

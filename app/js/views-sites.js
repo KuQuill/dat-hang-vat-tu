@@ -28,7 +28,7 @@ function renderSites() {
   $('#sites-table').innerHTML = list.length ? `<div class="table-wrap"><table class="sites-table">
     <thead><tr><th>Mã dự án</th><th>Tên dự án</th><th>Địa chỉ</th><th>Chỉ huy trưởng</th><th class="right">Số PR</th><th class="right">Nhân sự</th><th>Trạng thái</th><th></th></tr></thead>
     <tbody>${list.map(s => `<tr class="${s.active === false ? 'muted-row' : ''}">
-      <td class="mono"><b>${esc(s.code)}</b></td><td>${esc(s.name)}</td><td class="small">${esc(s.address || '')}</td><td>${esc(s.manager || '')}</td>
+      <td class="mono"><b>${esc(s.code)}</b></td><td>${esc(s.name)}${s.is_workshop ? ' <span class="badge b-violet">🏭 Xưởng</span>' : ''}</td><td class="small">${esc(s.address || '')}</td><td>${esc(s.manager || '')}</td>
       <td class="right">${count(s.id)}</td><td class="right">${people(s.id)}</td>
       <td>${s.active === false ? '<span class="badge b-gray">Ngừng</span>' : '<span class="badge b-green">Đang thi công</span>'}</td>
       <td><button class="btn sm" data-act="site-edit" data-id="${s.id}">✏ Sửa</button></td></tr>`).join('')}</tbody></table></div>`
@@ -43,12 +43,13 @@ async function siteDialog(s) {
       <label class="f full"><span class="req">Tên dự án</span><input id="st-name" value="${esc(s ? s.name : '')}" placeholder="vd: Nhà máy SSD — Long An"></label>
       <label class="f full">Địa chỉ<input id="st-addr" value="${esc(s ? s.address || '' : '')}"></label>
       <label class="f">Chỉ huy trưởng<input id="st-mgr" value="${esc(s ? s.manager || '' : '')}"></label>
+      <label class="f full chk"><input type="checkbox" id="st-ws" ${s && s.is_workshop ? 'checked' : ''}> <span>🏭 Là <b>xưởng sản xuất</b> (vd xưởng nội thất) — PR của xưởng được chia số lượng từng dòng cho nhiều dự án</span></label>
       <label class="f"><span>Trạng thái</span><select id="st-active"><option value="1" ${!s || s.active !== false ? 'selected' : ''}>Đang thi công</option><option value="0" ${s && s.active === false ? 'selected' : ''}>Ngừng (ẩn khỏi danh sách đặt hàng)</option></select></label></div>
       <p class="small muted">Mã dự án: 2–15 ký tự chữ in hoa, số hoặc gạch ngang.</p>`,
     actions: [{ label: 'Huỷ', value: null }, { label: s ? 'Lưu' : 'Thêm dự án', value: 'ok', primary: true,
       validate: v => !/^[A-Z0-9-]{2,15}$/.test(v.code) ? 'Mã dự án gồm 2–15 ký tự chữ in hoa / số / gạch ngang' : !v.name.trim() ? 'Nhập tên dự án' : null }],
     read: ov => ({ code: $('#st-code', ov).value.replace(/\s/g, '').toUpperCase(), name: $('#st-name', ov).value, address: $('#st-addr', ov).value,
-                   manager: $('#st-mgr', ov).value, active: $('#st-active', ov).value === '1' }),
+                   manager: $('#st-mgr', ov).value, active: $('#st-active', ov).value === '1', is_workshop: $('#st-ws', ov).checked }),
   });
   if (action === 'ok') runAction(() => ctx.B.upsertSite({ id: s ? s.id : null, ...data }), s ? `Đã lưu dự án ${data.code}` : `Đã thêm dự án ${data.code}`);
 }

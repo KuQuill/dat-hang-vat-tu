@@ -1,5 +1,5 @@
 // Sheet 3 — Theo dõi đơn hàng & nhận hàng
-import { isMgr, S, ctx, ACT, VIEWS, INPUTS, hooks, $, $$, esc, norm, todayISO, addDays, vnDate, fmtD, fmtDT, fmtN, numInput, parseNum, round6, debounce,
+import { isMgr, allocText, allocCode, S, ctx, ACT, VIEWS, INPUTS, hooks, $, $$, esc, norm, todayISO, addDays, vnDate, fmtD, fmtDT, fmtN, numInput, parseNum, round6, debounce,
          toast, modal, runAction, PR_ST, IT_ST, COND, ISSUES, RESOLUTION, PP_ST, OPEN_ST, ACTIVE_PR, badge, siteById, siteOptions, profName,
          isStaff, D, kindOf, khoFree, stockFree, assetBusy, loadVisibleImages, imgTag, pickFiles, filesToImages, uploadImages, exportRows } from './core.js';
 
@@ -38,7 +38,9 @@ function enrich() {
     for (const i of live) { if (i.batches.length) i.batches.forEach(b => { if (OPEN_ST.includes(b.status) && b.eta) etas.push(b.eta); }); else if (i.eta) etas.push(i.eta); }
     etas.sort();
     const site = siteById(pr.site_id) || {};
-    return { ...pr, its, atts: attBy.get(pr.id) || [], site_code: site.code || '?', site_name: site.name || '', requester: profName(pr.requested_by),
+    const allocIds = new Set(); for (const i of its) for (const a of (i.alloc || [])) allocIds.add(a.site_id);
+    const allocCodes = [...allocIds].map(id => (siteById(id) || {}).code || '?').sort();
+    return { ...pr, its, allocIds, allocCodes, workshop: !!site.is_workshop, atts: attBy.get(pr.id) || [], site_code: site.code || '?', site_name: site.name || '', requester: profName(pr.requested_by),
              done: live.filter(i => i.status === 'da_ve').length, total: live.length,
              issues: its.filter(i => i.status === 'co_van_de').length,
              toReceive: its.reduce((n, i) => n + i.batches.filter(b => b.status === 'dang_giao').length, 0),
@@ -49,11 +51,11 @@ function enrich() {
 function applyFilters(list) {
   const f = S.filters, q = norm(f.q), d30 = addDays(todayISO(), -30);
   return list.filter(p => {
-    if (f.site && p.site_code !== f.site) return false;
+    if (f.site && p.site_code !== f.site && !p.allocCodes.includes(f.site)) return false;
     if (f.status && p.status !== f.status) return false;
     if (f.from && p.created_date < f.from) return false;
     if (f.to && p.created_date > f.to) return false;
-    if (f.mine && p.requested_by !== S.user.id && !(S.profile.site_id && p.site_id === S.profile.site_id)) return false;
+    if (f.mine && p.requested_by !== S.user.id && !(S.profile.site_id && (p.site_id === S.profile.site_id || p.allocIds.has(S.profile.site_id)))) return false;
     if (f.late && !p.late) return false;
     if (f.kpi === 'pending' && p.status !== 'cho_duyet') return false;
     if (f.kpi === 'receive' && !p.toReceive) return false;
@@ -124,7 +126,7 @@ function prRowHTML(p) {
   const open = S.expanded.has(p.id);
   const pct = p.total ? Math.round(p.done / p.total * 100) : 0;
   const eta = p.eta_min ? (p.eta_min === p.eta_max ? fmtD(p.eta_min) : `${fmtD(p.eta_min)} → ${fmtD(p.eta_max)}`) : (p.status === 'da_ve' ? '—' : '<span class="muted">chưa có</span>');
-  const flags = [p.toReceive && canConfirm(p) ? `<span class="badge b-teal">${p.toReceive} đợt chờ nhận</span>` : '', p.buy && isStaff() ? `<span class="badge b-amber">🛒 ${p.buy} dòng cần mua</span>` : ''].join(' ');
+  const flags = [p.allocCodes.length ? `<span class="badge b-violet" title="PR của xưởng, chia cho các dự án">🏭 Cho ${esc(p.allocCodes.join(', '))}</span>` : '', p.toReceive && canConfirm(p) ? `<span class="badge b-teal">${p.toReceive} đợt chờ nhận</span>` : '', p.buy && isStaff() ? `<span class="badge b-amber">🛒 ${p.buy} dòng cần mua</span>` : ''].join(' ');
   return `<tr class="pr-row ${open ? 'open' : ''} ${p.late ? 'late' : ''}" data-act="toggle" data-id="${p.id}">
       <td><span class="caret">▶</span></td>
       <td><div class="mono nowrap"><b>${esc(p.pr_no)}</b>${p.atts.length ? ` <span class="muted small" title="Có ảnh">📷${p.atts.length}</span>` : ''}</div>${p.title && p.title !== p.pr_no ? `<div class="pr-title" title="${esc(p.title)}">${esc(p.title)}</div>` : ''}${flags ? `<div>${flags}</div>` : ''}</td>
@@ -218,7 +220,7 @@ function prDetailHTML(p) {
       : it.props.map(pp => `<button class="linkbtn small" data-act="goto-pp" data-id="${pp.id}">🛒 ${esc(pp.pp_no)}</button> ${badge(PP_ST, pp.status)}`).join(' ');
     const itemRow = `<tr class="item-row">
       <td>${it.line_no}</td>
-      <td><span class="mono">${esc(it.code)}</span> ${esc(it.name)}<div class="small muted">${esc(it.spec)}${it.note ? ' · ' + esc(it.note) : ''}</div></td>
+      <td><span class="mono">${esc(it.code)}</span> ${esc(it.name)}<div class="small muted">${esc(it.spec)}${it.note ? ' · ' + esc(it.note) : ''}</div>${it.alloc && it.alloc.length ? `<div class="small alloc-line">🏭 ${esc(allocText(it.alloc, it.qty))}</div>` : ''}</td>
       <td class="nowrap"><b>${fmtN(it.qty)}</b> ${esc(it.unit)}${Number(it.qty_received) > 0 && it.status !== 'da_ve' ? `<div class="small muted">đã nhận ${fmtN(it.qty_received)}</div>` : ''}<div id="sum-${it.id}">${sumHTML(it)}</div></td>
       <td class="small">${buy || (it.batches.length ? '' : `<span class="muted">Kho tổng trống ${fmtN(khoFree(it.material_id))}</span>`)}</td>
       <td class="small">${esc(it.supplier || '')}</td><td class="mono small">${esc(it.po_no || '')}</td>
@@ -482,7 +484,7 @@ Object.assign(ACT, {
       const bs = i.batches.length ? i.batches : [null];
       bs.forEach(b => rows.push({
         'Số PR': p.pr_no, 'Tên PR': p.title, 'Ngày tạo': fmtD(p.created_date), 'Công trường': p.site_code, 'Người đặt': p.requester, 'Ngày cần': fmtD(p.need_date),
-        'Trạng thái PR': (PR_ST[p.status] || [p.status])[0], 'Dòng': i.line_no, 'Mã VT': i.code, 'Vật tư': i.name, 'Quy cách': i.spec, 'SL đặt': Number(i.qty), 'ĐVT': i.unit,
+        'Trạng thái PR': (PR_ST[p.status] || [p.status])[0], 'Dòng': i.line_no, 'Mã VT': i.code, 'Vật tư': i.name, 'Quy cách': i.spec, 'SL đặt': Number(i.qty), 'ĐVT': i.unit, 'Dùng cho dự án': allocText(i.alloc, i.qty),
         'Đợt': b ? b.batch_no : '', 'SL đợt': b ? Number(b.qty) : '', 'Nguồn': b ? (b.source === 'kho' ? 'Kho tổng' : 'Mua mới') : '',
         'NCC': (b ? b.supplier : i.supplier) || '', 'Số PO': (b ? b.po_no : i.po_no) || '', 'Ngày về dự kiến': fmtD(b ? b.eta : i.eta),
         'Ngày nhận': fmtD(b ? b.received_date : i.received_date), 'SL thực nhận': b && b.qty_actual != null ? Number(b.qty_actual) : '',

@@ -274,7 +274,7 @@ export async function runAction(fn, okMsg, onOk) {
 /* ---------- Lựa chọn dùng chung ---------- */
 export function siteOptions(sel, first = '— Chọn công trường —', byId = false) {
   return `<option value="">${first}</option>` + S.sites.filter(s => s.active !== false).map(s => {
-    const v = byId ? s.id : s.code; return `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${esc(s.code)} — ${esc(s.name)}</option>`;
+    const v = byId ? s.id : s.code; return `<option value="${esc(v)}" ${v === sel ? 'selected' : ''}>${s.is_workshop ? '🏭 ' : ''}${esc(s.code)} — ${esc(s.name)}</option>`;
   }).join('');
 }
 export const locOptions = (sel, withAll = false) =>
@@ -303,5 +303,23 @@ export async function exportRows(rows, name, sheet) {
 }
 export function downloadText(text, name, type) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();
+}
+// Xưởng nội thất: phần chia số lượng của 1 dòng cho các dự án — alloc = [{site_id, qty}] (máy chủ) hoặc [{site, qty}] (nháp)
+export const allocCode = a => a.site || (siteById(a.site_id) || {}).code || '?';
+export const allocSum = alloc => (alloc || []).reduce((n, a) => n + (Number(a.qty) || 0), 0);
+export function allocText(alloc, total, unit = '') {
+  if (!alloc || !alloc.length) return '';
+  const rest = total != null ? Math.round((Number(total) - allocSum(alloc)) * 1e6) / 1e6 : 0;
+  return alloc.map(a => `${allocCode(a)} ${fmtN(a.qty)}`).join(' · ') + (rest > 0 ? ` · Dự phòng xưởng ${fmtN(rest)}` : '') + (unit ? ` ${unit}` : '');
+}
+// "SSD:60; TTN 40" → [{site:'SSD', qty:60}, {site:'TTN', qty:40}]
+export function parseAllocText(t) {
+  const out = []; const bad = [];
+  for (const part of String(t || '').split(/[;,\n]+/).map(x => x.trim()).filter(Boolean)) {
+    const m = part.match(/^([A-Za-z0-9-]+)\s*[:=x×\s]\s*([\d.,]+)$/);
+    const q = m ? parseNum(m[2]) : null;
+    if (m && q > 0) out.push({ site: m[1].toUpperCase(), qty: q }); else bad.push(part);
+  }
+  return { alloc: out, bad };
 }
 export const parsePaste = text => text.split(/\r?\n/).map(l => l.trim() ? (l.includes('\t') ? l.split('\t') : l.split('|')).map(x => x.trim()) : null).filter(Boolean);

@@ -1,10 +1,16 @@
 // Sheet 1 (Thông tin) và Sheet 2 (Đặt hàng)
 import { S, ctx, ACT, VIEWS, INPUTS, KEY, LS, IDB, DEMO, CONFIG, hooks, $, $$, esc, norm, uid, todayISO, fmtD, fmtDT, fmtN, parseNum, isNet, debounce,
          toast, modal, confirmBox, ROLE, siteByCode, siteById, siteOptions, groupOptions, matchMaterials, MATCH, khoFree, kindOf, D,
-         filesToImages, pickFiles, uploadImages, MAX_IMG_PER_PR, parsePaste, canOrder } from './core.js';
+         filesToImages, pickFiles, uploadImages, MAX_IMG_PER_PR, parsePaste, canOrder, allocText, allocSum, allocCode, parseAllocText } from './core.js';
 
 /* ---------- Nháp ---------- */
-const newRow = () => ({ key: uid(), name: '', spec: '', unit: '', qty: '', note: '', group: '', material_id: null, code: null, force_new: false });
+const newRow = () => ({ key: uid(), name: '', spec: '', unit: '', qty: '', note: '', group: '', material_id: null, code: null, force_new: false, alloc: [] });
+const isWS = () => { const s = siteByCode(S.draft.site_code); return !!(s && s.is_workshop); };
+function allocCell(r) {
+  const a = r.alloc || []; const q = parseNum(r.qty); const sum = allocSum(a);
+  const over = q > 0 && sum > q + 1e-9;
+  return `<button class="btn sm ${a.length ? '' : 'ghost'} alloc-btn ${over ? 'danger' : ''}" data-act="alloc" data-key="${r.key}" title="Chia số lượng cho các dự án">${a.length ? esc(allocText(a, q > 0 ? q : null)) : '＋ Chọn dự án'}</button>${over ? '<div class="small late-text">Vượt số lượng đặt</div>' : ''}`;
+}
 function loadDraft() {
   const d = LS.get(KEY.draft, null);
   S.draft = d && Array.isArray(d.rows) ? d : { title: '', site_code: '', category: '', need_date: '', delivery_place: '', receiver_name: '', receiver_phone: '', note: '', rows: [], editing: null };
@@ -132,6 +138,7 @@ function rowHTML(r, i) {
     <td class="c-spec"><input data-f="spec" value="${esc(r.spec)}" ${locked ? 'readonly' : ''}></td>
     <td class="c-unit"><input data-f="unit" value="${esc(r.unit)}" ${locked ? 'readonly' : ''}></td>
     <td class="c-qty"><input data-f="qty" value="${esc(r.qty)}" inputmode="decimal" class="right"></td>
+    ${isWS() ? `<td class="c-alloc" data-alloc="${r.key}">${allocCell(r)}</td>` : ''}
     <td class="c-note"><input data-f="note" value="${esc(r.note)}"></td>
     <td class="c-st rowstat" data-st>${rowStatus(r)}</td>
     <td class="nowrap"><button class="btn sm ghost" data-act="add-img" data-key="${r.key}" title="Ảnh cho dòng này">📷${nImg ? `<span class="imgcount">${nImg}</span>` : ''}</button>
@@ -163,6 +170,7 @@ VIEWS.order = {
           <label class="f full">Diễn giải (không bắt buộc)<input data-h="title" value="${esc(d.title)}" maxlength="200" placeholder="vd: Ống cấp nước tầng 3"></label>
         </div>
         <div class="prcode mt">Số PR: <b class="mono" id="pr-code">${esc(prCodePreview())}</b></div>
+        ${isWS() ? `<div class="ws-note mt">🏭 <b>Đặt hàng cho xưởng</b> — mỗi dòng bấm <b>＋ Chọn dự án</b> để chia số lượng cho các dự án sẽ dùng (có thể nhiều dự án). Phần chưa chia được tính là <i>dự phòng xưởng</i>.${allocSummaryHTML()}</div>` : ''}
         <div class="toolbar mt">
           <div class="small">Dự án: <b>${s ? esc(s.code + ' — ' + s.name) : '<span class="late-text">chưa chọn</span>'}</b>
             &nbsp;<button class="linkbtn" data-act="tab" data-tab="info">Đổi dự án</button></div>
@@ -170,7 +178,7 @@ VIEWS.order = {
         </div>
       </section>
       <div class="table-wrap"><table class="order-table">
-        <thead><tr><th>#</th><th>Mã vật tư</th><th>Tên vật tư <span class="req"></span></th><th>Quy cách</th><th>ĐVT</th><th class="right">Số lượng <span class="req"></span></th><th>Ghi chú</th><th>Mã / tồn kho tổng</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Mã vật tư</th><th>Tên vật tư <span class="req"></span></th><th>Quy cách</th><th>ĐVT</th><th class="right">Số lượng <span class="req"></span></th>${isWS() ? '<th>Dùng cho dự án</th>' : ''}<th>Ghi chú</th><th>Mã / tồn kho tổng</th><th></th></tr></thead>
         <tbody id="rows">${d.rows.map(rowHTML).join('')}</tbody>
       </table></div>
       <div class="toolbar mt">
@@ -254,7 +262,7 @@ INPUTS.push(e => {
     } else r[f] = t.value;
     saveDraft();
     if (f === 'name' || f === 'spec' || f === 'group') { if (f !== 'group') refreshRowStatus(r.key); refreshCodes(); }
-    if (f === 'qty') refreshAvail(r.key);
+    if (f === 'qty') { refreshAvail(r.key); const ac = $(`[data-alloc="${r.key}"]`); if (ac) ac.innerHTML = allocCell(r); }
     return true;
   }
   if (t.dataset.h) {
@@ -280,7 +288,7 @@ async function addDraftImages(rowKey) {
 async function pasteFromExcel() {
   const { action, data } = await modal({
     title: 'Dán danh sách vật tư từ Excel',
-    body: `<p class="muted small">Copy các cột theo thứ tự: <b>Tên vật tư (hoặc mã) · Quy cách · ĐVT · Số lượng · Ghi chú</b> rồi dán vào ô dưới.</p>
+    body: `<p class="muted small">Copy các cột theo thứ tự: <b>Tên vật tư (hoặc mã) · Quy cách · ĐVT · Số lượng · Ghi chú${isWS() ? ' · Dùng cho dự án' : ''}</b> rồi dán vào ô dưới.${isWS() ? ' Cột dự án ghi dạng <span class="mono">SSD:60; TTN:40</span>.' : ''}</p>
            <textarea id="paste-box" rows="10" placeholder="Thép thanh vằn D16\tCB400\ttấn\t5"></textarea>`,
     actions: [{ label: 'Huỷ', value: null }, { label: 'Thêm vào đơn', value: 'ok', primary: true }],
     read: ov => $('#paste-box', ov).value,
@@ -290,6 +298,7 @@ async function pasteFromExcel() {
   S.draft.rows = S.draft.rows.filter(r => r.name.trim() || String(r.qty).trim());
   for (const c of rows) {
     const r = newRow(); Object.assign(r, { name: c[0] || '', spec: c[1] || '', unit: c[2] || '', qty: c[3] || '', note: c[4] || '' });
+    if (isWS() && c[5]) { const pa = parseAllocText(c[5]); r.alloc = pa.alloc.filter(a => { const s = siteByCode(a.site); return s && !s.is_workshop && s.active !== false; }); }
     const exact = S.materials.find(m => m.code.toLowerCase() === r.name.toLowerCase());
     if (exact) Object.assign(r, { material_id: exact.id, code: exact.code, name: exact.name, spec: exact.spec || '', unit: r.unit || exact.unit });
     S.draft.rows.push(r);
@@ -314,6 +323,7 @@ async function submitOrder() {
     if (!r.name.trim()) errs.push(`Dòng ${i + 1}: thiếu tên vật tư`);
     if (q == null || Number.isNaN(q) || q <= 0) errs.push(`Dòng ${i + 1}: số lượng không hợp lệ`);
     if (r.material_id && kindOf(r.material_id) === 'tung_cai' && q > 0 && !Number.isInteger(q)) errs.push(`Dòng ${i + 1}: tài sản/thiết bị phải đặt số nguyên`);
+    if (isWS() && q > 0 && allocSum(r.alloc) > q + 1e-9) errs.push(`Dòng ${i + 1}: tổng chia cho các dự án (${fmtN(allocSum(r.alloc))}) vượt số lượng đặt (${fmtN(q)})`);
   });
   const showErrs = async list => {
     await modal({ title: 'Đơn hàng chưa đủ thông tin', body: `<ul>${list.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`, actions: [{ label: 'Đã hiểu', value: 'ok', primary: true }] });
@@ -346,9 +356,10 @@ async function submitOrder() {
 
   const payload = {
     title: d.title.trim(), site_code: d.site_code, category: d.category, need_date: d.need_date, note: d.note, delivery_place: d.delivery_place.trim(), receiver_name: d.receiver_name.trim(), receiver_phone: d.receiver_phone.trim(),
-    items: rows.map(r => r.material_id
+    items: rows.map(r => Object.assign(r.material_id
       ? { material_id: r.material_id, qty: parseNum(r.qty), unit: r.unit.trim() || null, note: r.note.trim() || null }
-      : { name: r.name.trim(), spec: r.spec.trim() || null, unit: r.unit.trim(), group: r.group || null, qty: parseNum(r.qty), note: r.note.trim() || null, force_new: !!r.force_new }),
+      : { name: r.name.trim(), spec: r.spec.trim() || null, unit: r.unit.trim(), group: r.group || null, qty: parseNum(r.qty), note: r.note.trim() || null, force_new: !!r.force_new },
+      isWS() && (r.alloc || []).length ? { alloc: r.alloc.map(a => ({ site: a.site, qty: a.qty })) } : {})),
   };
   const wasEdit = !!d.editing;
   const lineOf = im => (im.row ? (rows.findIndex(r => r.key === im.row) + 1) || null : null);
@@ -386,6 +397,38 @@ async function submitOrder() {
       if (btn) { btn.disabled = false; btn.textContent = 'Gửi đơn hàng (PR)'; }
     }
   }
+}
+// Tổng hợp phần chia của cả đơn theo dự án (số dòng)
+function allocSummaryHTML() {
+  const by = new Map();
+  for (const r of S.draft.rows) for (const a of (r.alloc || [])) by.set(a.site, (by.get(a.site) || 0) + 1);
+  return by.size ? `<div class="small mt-s">Đang chia cho: ${[...by].map(([c, n]) => `<b>${esc(c)}</b> (${n} dòng)`).join(' · ')}</div>` : '';
+}
+async function allocDialog(key) {
+  const r = S.draft.rows.find(x => x.key === key); if (!r) return;
+  const q = parseNum(r.qty); const cur = new Map((r.alloc || []).map(a => [a.site, a.qty]));
+  const sites = S.sites.filter(s => s.active !== false && !s.is_workshop).sort((a, b) => a.code.localeCompare(b.code));
+  if (!sites.length) return toast('Chưa có dự án nào để chia — khai báo ở màn hình Dự án', 'err');
+  const { action, data } = await modal({
+    title: `Dùng cho dự án — ${r.name || 'dòng ' + (S.draft.rows.indexOf(r) + 1)}`,
+    body: `<p class="small muted">Số lượng đặt: <b>${q > 0 ? fmtN(q) : '(chưa nhập)'}</b> ${esc(r.unit || '')}. Nhập số lượng cho từng dự án; phần còn lại là dự phòng của xưởng.</p>
+      <div class="table-wrap"><table class="alloc-table"><thead><tr><th>Dự án</th><th class="right">Số lượng</th></tr></thead><tbody>
+      ${sites.map(s => `<tr><td><b class="mono">${esc(s.code)}</b> ${esc(s.name)}</td><td class="right"><input class="right w90" inputmode="decimal" data-as="${esc(s.code)}" value="${cur.has(s.code) ? esc(String(cur.get(s.code))) : ''}"></td></tr>`).join('')}
+      </tbody></table></div><div class="small mt" id="as-sum"></div>`,
+    actions: [{ label: 'Huỷ', value: null }, { label: 'Bỏ chia', value: 'clear' }, { label: 'Lưu', value: 'ok', primary: true,
+      validate: v => v.bad ? `Số lượng "${v.bad}" không hợp lệ` : (q > 0 && v.sum > q + 1e-9) ? `Tổng chia ${fmtN(v.sum)} vượt số lượng đặt ${fmtN(q)}` : null }],
+    read: ov => { const out = []; let bad = null;
+      $$('[data-as]', ov).forEach(i => { const t = i.value.trim(); if (!t) return; const n = parseNum(t); if (!(n > 0)) bad = t; else out.push({ site: i.dataset.as, qty: n }); });
+      return { alloc: out, sum: allocSum(out), bad }; },
+    onOpen: ov => { const upd = () => { const s = $$('[data-as]', ov).reduce((n, i) => n + (parseNum(i.value) || 0), 0);
+      $('#as-sum', ov).innerHTML = `Đã chia: <b>${fmtN(s)}</b>${q > 0 ? ` / ${fmtN(q)} · ${s > q ? '<span class="late-text">vượt ' + fmtN(s - q) + '</span>' : 'dự phòng xưởng ' + fmtN(Math.round((q - s) * 1e6) / 1e6)}` : ''}`; };
+      ov.addEventListener('input', upd); upd(); const f = $('[data-as]', ov); if (f) f.focus(); },
+  });
+  if (action === 'clear') r.alloc = [];
+  else if (action === 'ok') r.alloc = data.alloc;
+  else return;
+  saveDraft(); refreshRow(key);
+  const n = $('.ws-note'); if (n) { const old = $('.ws-note .mt-s'); if (old) old.remove(); n.insertAdjacentHTML('beforeend', allocSummaryHTML()); }
 }
 async function clearDraftAfterSend() {
   S.draft.rows = [newRow(), newRow(), newRow()]; S.draft.note = ''; S.draft.title = ''; S.draft.editing = null; LS.set(KEY.draft, S.draft);
@@ -445,7 +488,8 @@ function loadPRForEdit(prId) {
   S.draft = { title: pr.title && pr.title !== pr.pr_no ? pr.title : '', site_code: site.code || '', category: pr.category || '', need_date: pr.need_date < todayISO() ? '' : pr.need_date,
     delivery_place: pr.delivery_place || '', receiver_name: pr.receiver_name || '', receiver_phone: pr.receiver_phone || '', note: pr.note || '',
     editing: { id: pr.id, pr_no: pr.pr_no, base_no: pr.base_no || pr.pr_no.replace(/\.R\d+$/, ''), revision: pr.revision || 1 },
-    rows: its.map(i => { const m = D().mat.get(i.material_id) || {}; return Object.assign(newRow(), { material_id: i.material_id, code: m.code, name: m.name || '', spec: m.spec || '', unit: i.unit, qty: String(i.qty), note: i.note || '' }); }) };
+    rows: its.map(i => { const m = D().mat.get(i.material_id) || {}; return Object.assign(newRow(), { material_id: i.material_id, code: m.code, name: m.name || '', spec: m.spec || '', unit: i.unit, qty: String(i.qty), note: i.note || '',
+      alloc: (i.alloc || []).map(a => ({ site: allocCode(a), qty: Number(a.qty) })) }); }) };
   if (!S.draft.rows.length) S.draft.rows = [newRow()];
   S.draftImages = []; saveDraftImages(); LS.set(KEY.draft, S.draft);
   S.tab = 'order'; LS.set(KEY.tab, S.tab); hooks.render(); window.scrollTo(0, 0);
@@ -475,13 +519,14 @@ Object.assign(ACT, {
   'pick-best': b => pickMaterial(b.dataset.key, b.dataset.id),
   'force-new': b => { const r = S.draft.rows.find(x => x.key === b.dataset.key); if (r) { r.force_new = true; saveDraft(); refreshRowStatus(r.key); refreshCodes(); } },
   submit: () => submitOrder(),
+  alloc: b => allocDialog(b.dataset.key),
   'ob-edit': async b => {
     const o = S.outbox.find(x => x.id === b.dataset.id); if (!o) return;
     const p = o.payload;
     S.draft = { title: p.title || '', site_code: p.site_code, category: p.category || '', editing: null, need_date: p.need_date, delivery_place: p.delivery_place || '', receiver_name: p.receiver_name || '', receiver_phone: p.receiver_phone || '', note: p.note || '',
       rows: p.items.map(it => { const r = newRow(); const m = it.material_id && D().mat.get(it.material_id);
         return Object.assign(r, m ? { material_id: m.id, code: m.code, name: m.name, spec: m.spec || '', unit: it.unit || m.unit } : { name: it.name || '', spec: it.spec || '', unit: it.unit || '', group: it.group || '', force_new: !!it.force_new },
-          { qty: String(it.qty ?? ''), note: it.note || '' }); }) };
+          { qty: String(it.qty ?? ''), note: it.note || '', alloc: it.alloc || [] }); }) };
     const imgs = (await IDB.get(KEY.obImgs(o.id))) || [];
     S.draftImages = imgs.map(im => ({ id: uid(), row: im.line ? (S.draft.rows[im.line - 1] || {}).key || null : null, name: im.name, blob: im.blob }));
     saveDraftImages(); IDB.del(KEY.obImgs(o.id));
