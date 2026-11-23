@@ -88,7 +88,7 @@ export function DemoBackend() {
     }
   }
   function recall(u, pr, reason) {
-    if (!(pr.requested_by === u.id || ['procurement', 'admin'].includes(u.role))) fail('Chỉ người đặt hàng hoặc phòng vật tư mới thu hồi được PR');
+    if (!(pr.requested_by === u.id || ['manager', 'admin'].includes(u.role))) fail('Chỉ người đặt hàng hoặc quản lý mới thu hồi được PR');
     if (pr.status === 'thu_hoi') return;
     if (!['cho_duyet', 'tu_choi', 'da_duyet', 'da_dat'].includes(pr.status)) fail('PR đang giao, đã nhận hoặc đã đóng — không thu hồi được, hãy liên hệ phòng vật tư');
     const itemIds = new Set(db.items.filter(i => i.pr_id === pr.id).map(i => i.id));
@@ -216,7 +216,7 @@ export function DemoBackend() {
 
   /* ---------- Dữ liệu mẫu ---------- */
   function seed() {
-    db = { v: 4, workCats: [['CB', 'Công tác chuẩn bị, lán trại, tạm', 10], ['XD', 'Xây dựng – kết cấu', 20], ['MEP', 'Cơ điện (M&E)', 30], ['PCCC', 'Phòng cháy chữa cháy', 40], ['HT', 'Hoàn thiện', 50], ['NT', 'Nội thất', 60], ['HTKT', 'Hạ tầng kỹ thuật', 70], ['CQ', 'Cảnh quan', 80], ['TB', 'Thiết bị', 90], ['K', 'Khác', 999]].map(([code, name, sort]) => ({ code, name, sort, active: true })), sites: [], groups: [], subgroups: [], materials: [], profiles: [], stock: [], stockLog: [], assets: [], assetHistory: [],
+    db = { v: 5, workCats: [['CB', 'Công tác chuẩn bị, lán trại, tạm', 10], ['XD', 'Xây dựng – kết cấu', 20], ['MEP', 'Cơ điện (M&E)', 30], ['PCCC', 'Phòng cháy chữa cháy', 40], ['HT', 'Hoàn thiện', 50], ['NT', 'Nội thất', 60], ['HTKT', 'Hạ tầng kỹ thuật', 70], ['CQ', 'Cảnh quan', 80], ['TB', 'Thiết bị', 90], ['K', 'Khác', 999]].map(([code, name, sort]) => ({ code, name, sort, active: true })), sites: [], groups: [], subgroups: [], materials: [], profiles: [], stock: [], stockLog: [], assets: [], assetHistory: [],
            prs: [], items: [], deliveries: [], atts: [], blobs: {}, proposals: [], lines: [], links: [], counters: {}, history: [] };
     const t = todayISO();
     db.groups = GROUPS.map(([code, name, kind, track_site, keywords, priority]) => ({ code, name, kind, track_site, keywords, priority, seq: 0, active: true }));
@@ -229,7 +229,7 @@ export function DemoBackend() {
     db.profiles = [
       { id: 'u1', email: 'site@demo.vn', full_name: 'Nguyễn Văn An', phone: '0901 111 222', role: 'site', site_id: 's1', active: true },
       { id: 'u2', email: 'vattu@demo.vn', full_name: 'Trần Thị Bình', phone: '0902 333 444', role: 'procurement', site_id: null, active: true },
-      { id: 'u4', email: 'thumua@demo.vn', full_name: 'Phạm Thu Hà', phone: '0904 777 888', role: 'purchasing', site_id: null, active: true },
+      { id: 'u4', email: 'quanly@demo.vn', full_name: 'Phạm Thu Hà', phone: '0904 777 888', role: 'manager', site_id: null, active: true },
       { id: 'u3', email: 'admin@demo.vn', full_name: 'Lê Minh Châu', phone: '0903 555 666', role: 'admin', site_id: null, active: true },
     ];
     const sys = { id: 'u2' };
@@ -306,7 +306,7 @@ export function DemoBackend() {
   }
 
   db = LS.get(KEY.demodb);
-  if (!db || db.v !== 4) db = seed();
+  if (!db || db.v !== 5) db = seed();
   const save = () => { if (!LS.set(KEY.demodb, db)) toast('Bộ nhớ demo trên máy đã đầy — hãy tạo lại dữ liệu demo', 'err'); };
   save();
   const clone = x => JSON.parse(JSON.stringify(x));
@@ -338,7 +338,7 @@ export function DemoBackend() {
     async imageUrls(paths) { return Object.fromEntries(paths.filter(p => db.blobs[p]).map(p => [p, db.blobs[p]])); },
 
     createPR: p => tx(() => {
-      const u = req(['site', 'procurement', 'purchasing', 'admin']);
+      const u = req(['site', 'manager', 'admin']);
       const site = db.sites.find(s => s.code.toUpperCase() === String(p.site_code || '').trim().toUpperCase() && s.active) || fail(`Không tìm thấy dự án / công trường "${p.site_code}"`);
       const wc = db.workCats.find(w => w.active && w.code === String(p.category || '').trim().toUpperCase()); const cat = wc ? wc.code : fail('Chọn hạng mục thi công cho PR');
       if (!String(p.delivery_place || '').trim()) fail('Nhập nơi nhận hàng');
@@ -358,7 +358,7 @@ export function DemoBackend() {
     recallPR: (prNo, reason) => tx(() => { const u = me() || fail('Bạn chưa đăng nhập'); recall(u, findPR(prNo), reason); return null; }),
     updatePR: (prNo, p) => tx(() => {
       const u = me() || fail('Bạn chưa đăng nhập'); const pr = findPR(prNo);
-      if (!(pr.requested_by === u.id || ['procurement', 'admin'].includes(u.role))) fail('Chỉ người đặt hàng hoặc phòng vật tư mới sửa được PR');
+      if (!(pr.requested_by === u.id || ['manager', 'admin'].includes(u.role))) fail('Chỉ người đặt hàng hoặc quản lý mới sửa được PR');
       if (['cho_duyet', 'tu_choi'].includes(pr.status)) recall(u, pr, 'sửa PR');
       else if (pr.status !== 'thu_hoi') fail('Hãy thu hồi PR trước khi sửa');
       if (!String(p.delivery_place || '').trim()) fail('Nhập nơi nhận hàng');
@@ -376,7 +376,7 @@ export function DemoBackend() {
       return { id: pr.id, pr_no: no, title: pr.title, site: db.sites.find(x => x.id === pr.site_id).code, need_date: pr.need_date, status: pr.status, items: out, images: (p.attachments || []).length };
     }),
     upsertWorkCategory: w => tx(() => {
-      req(['procurement', 'admin']);
+      req(['manager', 'admin']);
       const code = String(w.code || '').replace(/\s/g, '').toUpperCase();
       if (!/^[A-Z0-9]{1,6}$/.test(code)) fail('Mã hạng mục gồm 1–6 chữ in hoa hoặc số, vd: MEP');
       if (!String(w.name || '').trim()) fail('Nhập tên hạng mục');
@@ -385,7 +385,7 @@ export function DemoBackend() {
       return null;
     }),
     upsertSite: st => tx(() => {
-      req(['procurement', 'admin']);
+      req(['manager', 'admin']);
       const code = String(st.code || '').replace(/\s/g, '').toUpperCase();
       if (!/^[A-Z0-9-]{2,15}$/.test(code)) fail('Mã dự án gồm 2–15 ký tự chữ in hoa / số / gạch ngang, vd: SSD');
       if (!String(st.name || '').trim()) fail('Nhập tên dự án');
@@ -399,7 +399,7 @@ export function DemoBackend() {
     }),
     addAttachments: (prNo, files) => tx(() => {
       const u = me() || fail('Bạn chưa đăng nhập'); const pr = findPR(prNo);
-      if (pr.requested_by !== u.id && u.site_id !== pr.site_id && !['procurement', 'admin'].includes(u.role)) fail('Bạn không có quyền thực hiện thao tác này');
+      if (pr.requested_by !== u.id && u.site_id !== pr.site_id && !['manager', 'procurement', 'admin'].includes(u.role)) fail('Bạn không có quyền thực hiện thao tác này');
       if (db.atts.filter(a => a.pr_id === pr.id).length + files.length > 40) fail('Tối đa 40 ảnh cho một PR');
       for (const f of files) {
         let item = null, del = null;
@@ -410,7 +410,7 @@ export function DemoBackend() {
       return files.length;
     }),
     approvePR: (p, ok, reason) => tx(() => {
-      const u = req(['procurement', 'admin']); const pr = findPR(p);
+      const u = req(['manager', 'admin']); const pr = findPR(p);
       if (pr.status !== 'cho_duyet') fail('Phiếu không ở trạng thái chờ duyệt');
       if (!ok && !String(reason || '').trim()) fail('Cần ghi lý do từ chối');
       log(pr.id, null, u.id, 'status', pr.status, ok ? 'da_duyet' : 'tu_choi');
@@ -420,7 +420,7 @@ export function DemoBackend() {
     }),
     cancelPR: (p, reason) => tx(() => {
       const u = me() || fail('Bạn chưa đăng nhập'); const pr = findPR(p);
-      if (!((pr.requested_by === u.id && ['cho_duyet', 'thu_hoi', 'tu_choi'].includes(pr.status)) || (['procurement', 'admin'].includes(u.role) && !['da_ve', 'huy'].includes(pr.status)))) fail('Không thể huỷ phiếu ở trạng thái hiện tại');
+      if (!((pr.requested_by === u.id && ['cho_duyet', 'thu_hoi', 'tu_choi'].includes(pr.status)) || (u.role === 'manager' && ['cho_duyet', 'thu_hoi', 'tu_choi', 'da_duyet', 'da_dat'].includes(pr.status)) || (u.role === 'admin' && !['da_ve', 'huy'].includes(pr.status)))) fail('Không thể huỷ phiếu ở trạng thái hiện tại');
       for (const it of db.items.filter(i => i.pr_id === pr.id)) {
         const ds = db.deliveries.filter(d => d.item_id === it.id);
         for (const d of ds.filter(d => OPEN_ST.includes(d.status))) { d.status = 'huy'; db.links = db.links.filter(l => l.delivery_id !== d.id); }
@@ -499,7 +499,7 @@ export function DemoBackend() {
       const u = me() || fail('Bạn chưa đăng nhập');
       const d = db.deliveries.find(x => x.id === id) || fail('Không tìm thấy đợt giao');
       const it = db.items.find(i => i.id === d.item_id); const pr = db.prs.find(p => p.id === it.pr_id);
-      if (!(pr.requested_by === u.id || ['procurement', 'admin'].includes(u.role) || (u.site_id && u.site_id === pr.site_id)))
+      if (!(pr.requested_by === u.id || ['manager', 'procurement', 'admin'].includes(u.role) || (u.site_id && u.site_id === pr.site_id)))
         fail('Chỉ người đặt hàng, người cùng công trường hoặc phòng vật tư mới được xác nhận nhận hàng');
       if (['cho_duyet', 'tu_choi', 'huy'].includes(pr.status)) fail('Phiếu chưa được duyệt hoặc đã huỷ');
       if (!OPEN_ST.includes(d.status)) fail('Đợt này đã được xác nhận hoặc đã huỷ');
@@ -675,12 +675,11 @@ export function DemoBackend() {
       return { id: pp.id, pp_no: pp.pp_no, lines: no };
     }),
     updateProposal: (ppNo, status, note) => tx(() => {
-      const u = req(['purchasing', 'procurement', 'admin']);
+      const u = req(['procurement', 'admin']);
       const pp = db.proposals.find(p => p.pp_no === String(ppNo).toUpperCase()) || fail('Không tìm thấy đề xuất ' + ppNo);
       if (!['da_gui', 'thu_mua_nhan', 'dang_mua', 'da_mua', 'huy'].includes(status)) fail('Trạng thái không hợp lệ');
-      if (status === 'huy' && u.role === 'purchasing') fail('Chỉ phòng vật tư mới huỷ được đề xuất');
-      if (pp.status === 'huy') fail('Đề xuất đã huỷ');
-      pp.status = status; if ((note || '').trim()) pp.purchasing_note = note.trim(); if (u.role === 'purchasing') pp.handled_by = u.id; pp.updated_at = now();
+            if (pp.status === 'huy') fail('Đề xuất đã huỷ');
+      pp.status = status; if ((note || '').trim()) pp.purchasing_note = note.trim(); if (!pp.handled_by) pp.handled_by = u.id; pp.updated_at = now();
       const lineIds = new Set(db.lines.filter(l => l.proposal_id === pp.id).map(l => l.id));
       const dels = db.links.filter(l => lineIds.has(l.line_id)).map(l => db.deliveries.find(d => d.id === l.delivery_id)).filter(Boolean);
       if (status === 'huy') { const rm = new Set(dels.filter(d => ['cho_xu_ly', 'da_dat'].includes(d.status)).map(d => d.id)); db.links = db.links.filter(l => !rm.has(l.delivery_id)); }
@@ -692,7 +691,7 @@ export function DemoBackend() {
       return null;
     }),
     updateProposalLine: (id, f) => tx(() => {
-      req(['purchasing', 'procurement', 'admin']);
+      req(['procurement', 'admin']);
       const ln = db.lines.find(l => l.id === id) || fail('Không tìm thấy dòng đề xuất');
       const pp = db.proposals.find(p => p.id === ln.proposal_id); if (pp.status === 'huy') fail('Đề xuất đã huỷ');
       if ('supplier' in f) ln.supplier = (f.supplier || '').trim() || null;
@@ -718,7 +717,7 @@ export function DemoBackend() {
     }),
     adminUsers: b => tx(() => {
       const u = req(['admin']);
-      const ROLES = ['site', 'procurement', 'purchasing', 'admin'];
+      const ROLES = ['site', 'manager', 'procurement', 'admin'];
       if (b.action === 'create') {
         const email = String(b.email || '').trim().toLowerCase();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fail('Email không hợp lệ');

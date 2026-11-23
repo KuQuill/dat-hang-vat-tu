@@ -1,7 +1,7 @@
 // Sheet 1 (Thông tin) và Sheet 2 (Đặt hàng)
 import { S, ctx, ACT, VIEWS, INPUTS, KEY, LS, IDB, DEMO, CONFIG, hooks, $, $$, esc, norm, uid, todayISO, fmtD, fmtDT, fmtN, parseNum, isNet, debounce,
          toast, modal, confirmBox, ROLE, siteByCode, siteById, siteOptions, groupOptions, matchMaterials, MATCH, khoFree, kindOf, D,
-         filesToImages, pickFiles, uploadImages, MAX_IMG_PER_PR, parsePaste } from './core.js';
+         filesToImages, pickFiles, uploadImages, MAX_IMG_PER_PR, parsePaste, canOrder } from './core.js';
 
 /* ---------- Nháp ---------- */
 const newRow = () => ({ key: uid(), name: '', spec: '', unit: '', qty: '', note: '', group: '', material_id: null, code: null, force_new: false });
@@ -40,7 +40,7 @@ VIEWS.info = {
           <label class="f full">Ghi chú cho phòng vật tư<textarea data-h="note" rows="2">${esc(d.note)}</textarea></label>
         </div>
         <div class="toolbar mt"><span class="muted small">Tự động lưu nháp trên máy</span><span class="spacer"></span>
-          <button class="btn primary" data-act="tab" data-tab="order">Tiếp tục → Khai báo vật tư</button></div>
+          ${canOrder() ? '<button class="btn primary" data-act="tab" data-tab="order">Tiếp tục → Khai báo vật tư</button>' : '<span class="small muted">Quyền Phòng vật tư không lập PR</span>'}</div>
       </section>
       <section class="card">
         <h2>👤 Người đặt hàng</h2>
@@ -147,6 +147,7 @@ function draftThumbsHTML() {
 }
 VIEWS.order = {
   title: 'Đặt hàng',
+  show: () => canOrder(),
   html() {
     const d = S.draft; const s = siteByCode(d.site_code);
     const ed = d.editing;

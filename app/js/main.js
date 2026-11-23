@@ -114,7 +114,8 @@ function render() {
   renderChrome();
   const v = $('#view');
   if (!S.user) { v.innerHTML = viewLogin(); return; }
-  const view = VIEWS[S.tab] || VIEWS.info;
+  let view = VIEWS[S.tab];
+  if (!view || (view.show && !view.show())) { const first = tabsFor()[0]; S.tab = first ? first[0] : 'info'; view = VIEWS[S.tab] || VIEWS.info; }
   v.innerHTML = view.html();
   if (view.after) view.after();
 }
@@ -135,7 +136,7 @@ function viewLogin() {
     ${DEMO ? `<div class="demo-users"><div class="muted small">Chế độ demo — đăng nhập nhanh bằng:</div>
       <button class="btn" data-act="demo-login" data-email="site@demo.vn">👷 Người ở công trường LA01 (site@demo.vn)</button>
       <button class="btn" data-act="demo-login" data-email="vattu@demo.vn">📦 Phòng vật tư (vattu@demo.vn)</button>
-      <button class="btn" data-act="demo-login" data-email="thumua@demo.vn">🛒 Thu mua (thumua@demo.vn)</button>
+      <button class="btn" data-act="demo-login" data-email="quanly@demo.vn">🧭 Quản lý (quanly@demo.vn)</button>
       <button class="btn" data-act="demo-login" data-email="admin@demo.vn">🛠 Quản trị (admin@demo.vn)</button></div>` : ''}
   </div>`;
 }

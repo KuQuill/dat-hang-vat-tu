@@ -1,9 +1,9 @@
 // Dự án / công trường: mã dự án (dùng trong số PR), tên dự án, địa chỉ, chỉ huy trưởng
-import { S, ctx, ACT, VIEWS, hooks, $, esc, modal, runAction, isStaff, profName } from './core.js';
+import { S, ctx, ACT, VIEWS, hooks, $, esc, modal, runAction, isMgr, profName } from './core.js';
 
 VIEWS.sites = {
   title: 'Dự án',
-  show: () => isStaff(),
+  show: () => isMgr(),
   html() {
     return `<section class="card mb">
         <div class="toolbar"><div><h3>🏗 Dự án / công trường</h3>

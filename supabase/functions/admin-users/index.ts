@@ -15,7 +15,7 @@ const cors = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-const ROLES = ["site", "procurement", "purchasing", "admin"];
+const ROLES = ["site", "manager", "procurement", "admin"];
 const BAN_FOREVER = "876000h"; // ~100 năm
 
 Deno.serve(async (req) => {

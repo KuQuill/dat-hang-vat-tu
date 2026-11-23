@@ -7,7 +7,7 @@ VIEWS.users = {
   show: () => isAdmin(),
   html() {
     return `<section class="card mb">
-        <div class="toolbar"><div><h3>👥 Tài khoản người dùng</h3><div class="small muted">Công ty cấp email + mật khẩu cho từng người. Quyền <b>Thu mua</b> chỉ xem và cập nhật đề xuất mua.</div></div>
+        <div class="toolbar"><div><h3>👥 Tài khoản người dùng</h3><div class="small muted">Công ty cấp email + mật khẩu cho từng người. <b>Công trường</b>: đặt hàng, nhận hàng, thu hồi / sửa / huỷ PR của mình, xuất PDF · <b>Quản lý</b>: như công trường cho mọi dự án + duyệt PR + khai báo dự án · <b>Phòng vật tư</b>: kho, tài sản, giao hàng, ETA, đề xuất mua · <b>Quản trị</b>: toàn quyền.</div></div>
           <span class="spacer"></span><input data-ufilter value="${esc(S.ufilter)}" placeholder="🔍 Tìm tên, email…" class="w240">
           <button class="btn" data-act="user-csv">📋 Nhập CSV hàng loạt</button>
           <button class="btn primary" data-act="user-new">＋ Tạo tài khoản</button></div>
@@ -39,12 +39,12 @@ INPUTS.push(e => { if ('ufilter' in e.target.dataset) { S.ufilter = e.target.val
 
 /* ---------- Nhập CSV hàng loạt ---------- */
 const CSV_HEAD = ['Họ tên', 'Email', 'Mật khẩu', 'Quyền', 'Mã dự án'];
-// Quyền: chấp nhận mã (site/procurement/purchasing/admin) hoặc tên tiếng Việt
+// Quyền: chấp nhận mã (site/manager/procurement/admin) hoặc tên tiếng Việt; "Thu mua" → Phòng vật tư
 function parseRole(v) {
   const n = norm(v).replace(/[_-]/g, ' ');
   if (!n || ['site', 'cong truong', 'nhan vien', 'nhan vien cong truong'].includes(n)) return 'site';
-  if (['procurement', 'phong vat tu', 'vat tu'].includes(n)) return 'procurement';
-  if (['purchasing', 'thu mua'].includes(n)) return 'purchasing';
+  if (['manager', 'quan ly', 'quan ly du an', 'giam doc du an'].includes(n)) return 'manager';
+  if (['procurement', 'phong vat tu', 'vat tu', 'purchasing', 'thu mua'].includes(n)) return 'procurement';
   if (['admin', 'quan tri'].includes(n)) return 'admin';
   return null;
 }
@@ -101,7 +101,7 @@ async function importUsers() {
             <td class="small">${r.errors.length ? `<span class="late-text">${esc(r.errors.join(', '))}</span>` : `<span class="ok-text">OK</span>${r.generated ? ' · MK tự tạo' : ''}`}</td></tr>`).join('')}</tbody></table></div>` : '';
       };
       box.addEventListener('input', debounce(preview, 250));
-      $('#uc-tpl', ov).addEventListener('click', () => downloadText('﻿' + [CSV_HEAD.join(','), 'Nguyễn Văn A,a.nguyen@congty.vn,,Công trường,SSD', 'Trần Thị B,b.tran@congty.vn,MatKhau123,Phòng vật tư,', 'Lê Văn C,c.le@congty.vn,,Thu mua,'].join('\r\n'), 'mau-tai-khoan.csv', 'text/csv;charset=utf-8'));
+      $('#uc-tpl', ov).addEventListener('click', () => downloadText('﻿' + [CSV_HEAD.join(','), 'Nguyễn Văn A,a.nguyen@congty.vn,,Công trường,SSD', 'Trần Thị B,b.tran@congty.vn,MatKhau123,Phòng vật tư,', 'Lê Văn C,c.le@congty.vn,,Quản lý,'].join('\r\n'), 'mau-tai-khoan.csv', 'text/csv;charset=utf-8'));
       $('#uc-file', ov).addEventListener('click', () => {
         const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.csv,text/csv,.txt';
         inp.onchange = async () => { const f = inp.files[0]; if (!f) return; fileText = await f.text(); box.value = fileText; $('#uc-fname', ov).textContent = f.name; preview(); };

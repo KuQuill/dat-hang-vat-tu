@@ -54,7 +54,7 @@ export const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t);
 export const genPassword = () => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'; let s = ''; for (const x of crypto.getRandomValues(new Uint32Array(10))) s += c[x % c.length]; return s; };
 
 /* ---------- Hằng số ---------- */
-export const ROLE = { site: 'Công trường', procurement: 'Phòng vật tư', purchasing: 'Thu mua', admin: 'Quản trị' };
+export const ROLE = { site: 'Công trường', manager: 'Quản lý', procurement: 'Phòng vật tư', admin: 'Quản trị' };
 export const PR_ST = {
   cho_duyet: ['Chờ duyệt', 'b-amber'], da_duyet: ['Đã duyệt', 'b-blue'], tu_choi: ['Từ chối', 'b-red'],
   da_dat: ['Đã đặt hàng', 'b-violet'], dang_giao: ['Đang giao', 'b-teal'], co_van_de: ['Có vấn đề nhận hàng', 'b-red'],
@@ -107,7 +107,11 @@ export const locLabel = siteId => { if (!siteId) return 'Kho tổng'; const s = 
 export const profName = id => { const p = S.profiles.find(x => x.id === id); return p ? (p.full_name || p.email) : ''; };
 export const isStaff = () => !!(S.profile && ['procurement', 'admin'].includes(S.profile.role));
 export const isAdmin = () => !!(S.profile && S.profile.role === 'admin');
-export const isPurch = () => !!(S.profile && ['purchasing', 'procurement', 'admin'].includes(S.profile.role));
+export const isPurch = isStaff;   // Thu mua đã gộp vào Phòng vật tư
+// Quản lý (và quản trị): duyệt PR, khai báo dự án, thu hồi / sửa / huỷ PR mọi dự án
+export const isMgr = () => !!(S.profile && ['manager', 'admin'].includes(S.profile.role));
+// Được lập PR: công trường, quản lý, quản trị
+export const canOrder = () => !!(S.profile && ['site', 'manager', 'admin'].includes(S.profile.role));
 
 /* ---------- Số liệu suy ra (tính lại khi dữ liệu đổi) ---------- */
 let _d = null, _dv = -1;

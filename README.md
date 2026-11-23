@@ -26,7 +26,7 @@ Web app dùng ES module nên cần mở qua web server (không mở trực tiế
 python -m http.server 8765 --directory app
 ```
 
-Mở http://localhost:8765 → đăng nhập nhanh bằng 4 vai: công trường, phòng vật tư, thu mua, quản trị.
+Mở http://localhost:8765 → đăng nhập nhanh bằng 4 vai: công trường, quản lý, phòng vật tư, quản trị.
 
 ## Quy trình
 
@@ -48,10 +48,11 @@ Phòng vật tư chuyển đợt sang "Đang giao" ──► Công trường b�
 | Màn hình | Ai dùng | Nội dung |
 |---|---|---|
 | **1. Thông tin** | Mọi người | Công trường, ngày cần, địa điểm giao; thông tin cá nhân; đổi mật khẩu |
-| **2. Đặt hàng** | Mọi người | Hạng mục thi công, **ngày cần có hàng**, **nơi nhận hàng + người nhận + SĐT**, diễn giải, vật tư (vật tư mới hiện **mã tự động dự kiến**) (gợi ý từ kho + **số còn trống ở kho tổng**, báo **cần mua mới**), dán từ Excel, ảnh |
-| **3. Theo dõi & nhận hàng** | Mọi người | Toàn bộ PR. Phòng vật tư duyệt, chia đợt, chọn nguồn kho / mua, NCC, PO, ngày về. Công trường **xác nhận nhận hàng** từng đợt |
+| **2. Đặt hàng** | Công trường · Quản lý · Quản trị | Hạng mục thi công, **ngày cần có hàng**, **nơi nhận hàng + người nhận + SĐT**, diễn giải, vật tư (vật tư mới hiện **mã tự động dự kiến**) (gợi ý từ kho + **số còn trống ở kho tổng**, báo **cần mua mới**), dán từ Excel, ảnh |
+| **3. Theo dõi & nhận hàng** | Mọi người | Toàn bộ PR. **Quản lý duyệt**; phòng vật tư chia đợt, chọn nguồn kho / mua, NCC, PO, ngày về. Công trường **xác nhận nhận hàng** từng đợt |
 | **4. Kho & tài sản** | Mọi người xem · phòng vật tư sửa | **Vật tư theo số lượng** (vị trí, tình trạng, ảnh, tồn tối thiểu, đang giữ cho PR) · **Tài sản từng chiếc** (mã tài sản, biển số, vị trí, tình trạng, lịch sử, **tem QR**) · **Nhóm vật tư** |
-| **5. Đề xuất mua** | Phòng vật tư · Thu mua | Danh sách cần mua → lập đề xuất. Thu mua cập nhật trạng thái, NCC, đơn giá, ngày về, PO |
+| **5. Đề xuất mua** | Phòng vật tư | Danh sách cần mua → lập đề xuất → cập nhật trạng thái, NCC, đơn giá, ngày về, PO |
+| **Dự án** | Quản lý · Quản trị | Khai báo dự án, hạng mục thi công |
 | **6. Tài khoản** | Quản trị | Tạo tài khoản, đổi quyền, gán công trường, khoá, đặt lại mật khẩu |
 
 ### Số PR & thu hồi / sửa PR
@@ -60,18 +61,19 @@ Phòng vật tư chuyển đợt sang "Đang giao" ──► Công trường b�
 - **Đặt nhầm?** Ở màn hình Theo dõi bấm **↩ Thu hồi & sửa** → PR chuyển *Đã thu hồi – đang sửa*, kế hoạch giao và hàng đang giữ ở kho được nhả ra →
   sửa ở màn hình Đặt hàng → **Gửi lại PR đã sửa** → thành bản **R2, R3…** và chờ duyệt lại.
 - Thu hồi được khi PR đang chờ duyệt, bị từ chối, đã duyệt hoặc đã đặt hàng — nhưng **chưa có đợt nào đang giao / đã nhận** và Thu mua **chưa đang mua** cho PR đó.
-- Người đặt (hoặc phòng vật tư) thu hồi được; người đặt huỷ được PR khi chờ duyệt / đã thu hồi / bị từ chối.
+- Người đặt hoặc quản lý thu hồi / sửa được. Người đặt huỷ được PR khi chờ duyệt / đã thu hồi / bị từ chối (PR đã duyệt: thu hồi trước rồi huỷ);
+  quản lý huỷ được PR chưa có hàng đi đường (đến *Đã đặt hàng*); quản trị huỷ được đến trước khi nhận đủ.
 
 ### Xuất PDF để ký
 Ở màn hình Theo dõi (hoặc ngay sau khi gửi PR) bấm **⬇ Xuất PDF** → tải file `SỐ-PR.pdf`: phiếu đề nghị cấp vật tư A4 gồm thông tin PR, bảng vật tư và 2 ô ký (Người đặt hàng · Chỉ huy trưởng) để ký và gửi lên nhóm.
 
 ### Dự án / công trường
-Màn hình **Dự án** (phòng vật tư, quản trị): thêm / sửa **mã dự án**, tên dự án, địa chỉ, chỉ huy trưởng, ngừng dự án.
+Màn hình **Dự án** (quản lý, quản trị): thêm / sửa **mã dự án**, tên dự án, địa chỉ, chỉ huy trưởng, ngừng dự án.
 Mã dự án đã có PR thì không đổi được (vì nằm trong số PR).
 
 ### Nhập tài khoản hàng loạt (CSV)
 Màn hình **Tài khoản → 📋 Nhập CSV hàng loạt** (quản trị). Cột: `Họ tên, Email, Mật khẩu, Quyền, Mã dự án`.
-Mật khẩu để trống → tự tạo. Quyền: Công trường / Phòng vật tư / Thu mua / Quản trị (hoặc site / procurement / purchasing / admin).
+Mật khẩu để trống → tự tạo. Quyền: Công trường / Quản lý / Phòng vật tư / Quản trị (hoặc site / manager / procurement / admin). Ghi "Thu mua" sẽ được tính là Phòng vật tư.
 Xem trước từng dòng (dòng lỗi bị bỏ qua), tạo xong tải được file danh sách email + mật khẩu để gửi nội bộ.
 
 ### Mã vật tư & nhóm
@@ -103,7 +105,7 @@ Phòng vật tư thêm nhóm / nhóm con trong *Kho & tài sản → 🗂 Nhóm 
 ## Bước 1 — Tạo Supabase
 
 1. https://supabase.com → **New project** → Region **Southeast Asia (Singapore)**.
-2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql` (thư mục `supabase/migrations/`).
+2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql`, `004_roles_manager.sql` (thư mục `supabase/migrations/`).
 3. Thêm công trường:
    ```sql
    insert into public.sites (code, name, address, manager) values
@@ -131,9 +133,9 @@ npx supabase functions deploy admin-users
 
 | Quyền | Được làm |
 |---|---|
-| `site` Công trường | Xem đơn, kho; đặt PR; **xác nhận nhận hàng** PR của mình / công trường mình; thêm ảnh |
-| `procurement` Phòng vật tư | + Duyệt, kế hoạch giao, xử lý vấn đề nhận hàng, cập nhật kho & tài sản, lập đề xuất mua |
-| `purchasing` Thu mua | Xem; cập nhật trạng thái, NCC, giá, ngày về, PO của đề xuất mua |
+| `site` Công trường | Đặt PR; theo dõi; **xác nhận nhận hàng** PR của mình / công trường mình; thu hồi, sửa, huỷ PR của mình; xuất PDF; thêm ảnh |
+| `manager` Quản lý | Như công trường cho **mọi dự án** + **duyệt / từ chối PR** + khai báo dự án, hạng mục thi công |
+| `procurement` Phòng vật tư | (gộp cả Thu mua) Kế hoạch giao, chọn nguồn kho / mua, NCC, PO, ngày về, xử lý vấn đề nhận hàng, **cập nhật kho & tài sản**, đề xuất mua. Không lập / duyệt PR |
 | `admin` Quản trị | Tất cả + quản lý tài khoản |
 
 ## Bước 3 — Nhập dữ liệu ban đầu

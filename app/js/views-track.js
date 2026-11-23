@@ -1,10 +1,10 @@
 // Sheet 3 — Theo dõi đơn hàng & nhận hàng
-import { S, ctx, ACT, VIEWS, INPUTS, hooks, $, $$, esc, norm, todayISO, addDays, vnDate, fmtD, fmtDT, fmtN, numInput, parseNum, round6, debounce,
+import { isMgr, S, ctx, ACT, VIEWS, INPUTS, hooks, $, $$, esc, norm, todayISO, addDays, vnDate, fmtD, fmtDT, fmtN, numInput, parseNum, round6, debounce,
          toast, modal, runAction, PR_ST, IT_ST, COND, ISSUES, RESOLUTION, PP_ST, OPEN_ST, ACTIVE_PR, badge, siteById, siteOptions, profName,
          isStaff, D, kindOf, khoFree, stockFree, assetBusy, loadVisibleImages, imgTag, pickFiles, filesToImages, uploadImages, exportRows } from './core.js';
 
 const CLOSED = ['da_ve', 'co_van_de', 'huy'];
-const canConfirm = pr => !!S.profile && (pr.requested_by === S.user.id || isStaff() || (S.profile.site_id && S.profile.site_id === pr.site_id));
+const canConfirm = pr => !!S.profile && (pr.requested_by === S.user.id || isStaff() || isMgr() || (S.profile.site_id && S.profile.site_id === pr.site_id));
 
 /* ---------- Gộp dữ liệu PR ---------- */
 function enrich() {
@@ -197,13 +197,14 @@ function receiptHTML(b, it) {
 }
 
 function prDetailHTML(p) {
-  const staff = isStaff();
+  const staff = isStaff(), mgr = isMgr();
   const editable = staff && ['da_duyet', 'da_dat', 'dang_giao', 'co_van_de', 'da_ve'].includes(p.status);
   const owner = p.requested_by === S.user.id;
-  const canCancel = (owner && ['cho_duyet', 'thu_hoi', 'tu_choi'].includes(p.status)) || (staff && !['da_ve', 'huy'].includes(p.status));
-  const canRecall = (owner || staff) && ['cho_duyet', 'tu_choi', 'da_duyet', 'da_dat'].includes(p.status)
+  const canCancel = (owner && ['cho_duyet', 'thu_hoi', 'tu_choi'].includes(p.status)) || (S.profile.role === 'manager' && ['cho_duyet', 'thu_hoi', 'tu_choi', 'da_duyet', 'da_dat'].includes(p.status))
+    || (S.profile.role === 'admin' && !['da_ve', 'huy'].includes(p.status));
+  const canRecall = (owner || mgr) && ['cho_duyet', 'tu_choi', 'da_duyet', 'da_dat'].includes(p.status)
     && !p.its.some(i => i.batches.some(b => ['dang_giao', 'da_ve', 'co_van_de'].includes(b.status)));
-  const canAddImg = p.requested_by === S.user.id || staff || (S.profile.site_id && S.profile.site_id === p.site_id);
+  const canAddImg = p.requested_by === S.user.id || staff || mgr || (S.profile.site_id && S.profile.site_id === p.site_id);
   const conf = canConfirm(p) && !['cho_duyet', 'tu_choi', 'huy'].includes(p.status);
   const bOpts = sel => OPEN_ST.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${IT_ST[k][0]}</option>`).join('');
   const lineOfItem = new Map(p.its.map(i => [i.id, i.line_no]));
@@ -259,10 +260,10 @@ function prDetailHTML(p) {
         ${p.approved_by ? ` · ${p.status === 'tu_choi' ? 'Từ chối' : 'Duyệt'} bởi ${esc(profName(p.approved_by))} lúc ${esc(fmtDT(p.approved_at))}` : ''}
         ${p.reject_reason ? ` · <span class="late-text">Lý do: ${esc(p.reject_reason)}</span>` : ''}</div></div>
       <span class="spacer"></span>
-      ${staff && p.status === 'cho_duyet' ? `<button class="btn sm ok" data-act="approve" data-pr="${esc(p.pr_no)}" title="Duyệt và tự lập kế hoạch giao: lấy kho tổng trước, phần thiếu → cần mua">✅ Duyệt</button><button class="btn sm danger" data-act="reject" data-pr="${esc(p.pr_no)}">❌ Từ chối</button>` : ''}
+      ${mgr && p.status === 'cho_duyet' ? `<button class="btn sm ok" data-act="approve" data-pr="${esc(p.pr_no)}" title="Duyệt và tự lập kế hoạch giao: lấy kho tổng trước, phần thiếu → cần mua">✅ Duyệt</button><button class="btn sm danger" data-act="reject" data-pr="${esc(p.pr_no)}">❌ Từ chối</button>` : ''}
       ${editable && p.status !== 'da_ve' ? `<button class="btn sm" data-act="bulk" data-pr="${esc(p.pr_no)}">Cập nhật nhanh cả phiếu…</button>` : ''}
       ${canRecall ? `<button class="btn sm" data-act="recall" data-pr="${esc(p.pr_no)}" data-id="${p.id}" title="Thu hồi để sửa khi đặt nhầm">↩ Thu hồi & sửa</button>` : ''}
-      ${p.status === 'thu_hoi' && (owner || staff) ? `<button class="btn sm primary" data-act="load-pr-edit" data-id="${p.id}">✏ Tiếp tục sửa</button>` : ''}
+      ${p.status === 'thu_hoi' && (owner || mgr) ? `<button class="btn sm primary" data-act="load-pr-edit" data-id="${p.id}">✏ Tiếp tục sửa</button>` : ''}
       <button class="btn sm" data-act="pr-pdf" data-id="${p.id}" title="Xuất phiếu đề nghị PDF để ký">⬇ Xuất PDF</button>
       ${canAddImg ? `<button class="btn sm" data-act="pr-add-img" data-pr="${esc(p.pr_no)}">📷 Thêm ảnh</button>` : ''}
       ${canCancel ? `<button class="btn sm danger" data-act="cancel" data-pr="${esc(p.pr_no)}">Huỷ phiếu</button>` : ''}

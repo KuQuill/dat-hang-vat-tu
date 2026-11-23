@@ -2,7 +2,7 @@
 // • File của ứng dụng: lấy bản mới từ mạng trước, mất mạng thì dùng bản đã lưu.
 // • Thư viện CDN (có số phiên bản cố định): lưu lại, dùng bản đã lưu.
 // • Dữ liệu Supabase: KHÔNG lưu ở đây (ứng dụng tự lưu bộ đệm và đơn chờ gửi).
-const CACHE = 'vattu-v2.3.0';   // đổi mỗi lần phát hành
+const CACHE = 'vattu-v2.4.0';   // đổi mỗi lần phát hành
 const SHELL = ['./', 'index.html', 'styles.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/logo.svg',
   'js/config.js', 'js/core.js', 'js/main.js', 'js/backend-supabase.js', 'js/backend-demo.js',
   'js/views-order.js', 'js/views-track.js', 'js/views-kho.js', 'js/views-purchase.js', 'js/views-sites.js', 'js/views-users.js', 'js/pdf.js'];
