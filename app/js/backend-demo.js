@@ -216,7 +216,7 @@ export function DemoBackend() {
 
   /* ---------- Dữ liệu mẫu ---------- */
   function seed() {
-    db = { v: 3, sites: [], groups: [], subgroups: [], materials: [], profiles: [], stock: [], stockLog: [], assets: [], assetHistory: [],
+    db = { v: 4, workCats: [['CB', 'Công tác chuẩn bị, lán trại, tạm', 10], ['XD', 'Xây dựng – kết cấu', 20], ['MEP', 'Cơ điện (M&E)', 30], ['PCCC', 'Phòng cháy chữa cháy', 40], ['HT', 'Hoàn thiện', 50], ['NT', 'Nội thất', 60], ['HTKT', 'Hạ tầng kỹ thuật', 70], ['CQ', 'Cảnh quan', 80], ['TB', 'Thiết bị', 90], ['K', 'Khác', 999]].map(([code, name, sort]) => ({ code, name, sort, active: true })), sites: [], groups: [], subgroups: [], materials: [], profiles: [], stock: [], stockLog: [], assets: [], assetHistory: [],
            prs: [], items: [], deliveries: [], atts: [], blobs: {}, proposals: [], lines: [], links: [], counters: {}, history: [] };
     const t = todayISO();
     db.groups = GROUPS.map(([code, name, kind, track_site, keywords, priority]) => ({ code, name, kind, track_site, keywords, priority, seq: 0, active: true }));
@@ -275,7 +275,7 @@ export function DemoBackend() {
     const mkItem = (pr, no, k, qty) => { const it = { id: uid(), pr_id: pr.id, line_no: no, material_id: M[k].id, qty, unit: M[k].unit, note: null, supplier: null, po_no: null, eta: null, received_date: null, qty_received: 0, status: 'cho_xu_ly', updated_at: pr.created_at }; db.items.push(it); return it; };
 
     // PR1: thép chia 2 đợt (đợt kho đã nhận, đợt mua đang trễ) + xi măng đã nhận
-    const p1 = mkPR('s1', 'u1', 'Thép + xi măng đổ móng nhà xưởng', addDays(t, -2), 'dang_giao', 9, 'KC');
+    const p1 = mkPR('s1', 'u1', 'Thép + xi măng đổ móng nhà xưởng', addDays(t, -2), 'dang_giao', 9, 'XD');
     const i11 = mkItem(p1, 1, 'd16', 40), i12 = mkItem(p1, 2, 'pcb40', 200);
     db.deliveries.push(newDel(i11.id, 1, 20, { source: 'kho', stock_id: stockRow('d16').id, status: 'da_ve', qty_actual: 20, received_date: addDays(t, -6), confirmed_by: 'u1', confirmed_at: now(), stock_moved: true, supplier: 'Kho tổng' }));
     const b12 = newDel(i11.id, 2, 20, { status: 'da_dat', eta: addDays(t, -1), supplier: 'Hòa Phát', po_no: 'PO-1021' }); db.deliveries.push(b12);
@@ -287,7 +287,7 @@ export function DemoBackend() {
       receipt_note: 'Giao nhầm dây CV 4.0, công trường đặt CV 2.5', received_date: addDays(t, -1), confirmed_by: 'u1', confirmed_at: now() }));
     db.deliveries.push(newDel(i22.id, 1, 12, { source: 'kho', stock_id: stockRow('mcb').id, status: 'dang_giao', eta: addDays(t, 1) }));
     // PR3: chờ duyệt — có xe đào, máy hàn, giàn giáo, ống PPR (kho thiếu)
-    const p3 = mkPR('s1', 'u1', 'Thiết bị + vật tư thi công tầng 3', addDays(t, 10), 'cho_duyet', 1, 'MM');
+    const p3 = mkPR('s1', 'u1', 'Thiết bị + vật tư thi công tầng 3', addDays(t, 10), 'cho_duyet', 1, 'XD');
     mkItem(p3, 1, 'pc200', 1); mkItem(p3, 2, 'han', 2); mkItem(p3, 3, 'giao', 200); mkItem(p3, 4, 'ppr', 150);
     // PR4: bàn thiếu 2 cái → cần mua (chưa đề xuất); ghế đang giao
     const p4 = mkPR('s3', 'u3', 'Bàn ghế văn phòng ban chỉ huy', addDays(t, 5), 'dang_giao', 3, 'NT');
@@ -306,7 +306,7 @@ export function DemoBackend() {
   }
 
   db = LS.get(KEY.demodb);
-  if (!db || db.v !== 3) db = seed();
+  if (!db || db.v !== 4) db = seed();
   const save = () => { if (!LS.set(KEY.demodb, db)) toast('Bộ nhớ demo trên máy đã đầy — hãy tạo lại dữ liệu demo', 'err'); };
   save();
   const clone = x => JSON.parse(JSON.stringify(x));
@@ -327,7 +327,7 @@ export function DemoBackend() {
     async signOut() { LS.del(KEY.demouser); },
     async changePassword(pw) { if (String(pw).length < 8) fail('Mật khẩu tối thiểu 8 ký tự'); return delay(null); },
     async pull() {
-      return delay(clone({ sites: db.sites, groups: db.groups, subgroups: db.subgroups, materials: db.materials, profiles: db.profiles, stock: db.stock, assets: db.assets,
+      return delay(clone({ sites: db.sites, groups: db.groups, subgroups: db.subgroups, workCats: db.workCats, materials: db.materials, profiles: db.profiles, stock: db.stock, assets: db.assets,
         proposals: db.proposals, lines: db.lines, links: db.links, prs: db.prs, items: db.items, atts: db.atts, deliveries: db.deliveries, changedItems: null, full: true }));
     },
     async assetHistory(id) { return delay(clone(db.assetHistory.filter(h => h.asset_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)))); },
@@ -340,13 +340,14 @@ export function DemoBackend() {
     createPR: p => tx(() => {
       const u = req(['site', 'procurement', 'purchasing', 'admin']);
       const site = db.sites.find(s => s.code.toUpperCase() === String(p.site_code || '').trim().toUpperCase() && s.active) || fail(`Không tìm thấy dự án / công trường "${p.site_code}"`);
-      const cat = resolveGroup(p.category) || fail('Chọn hạng mục cho PR');
+      const wc = db.workCats.find(w => w.active && w.code === String(p.category || '').trim().toUpperCase()); const cat = wc ? wc.code : fail('Chọn hạng mục thi công cho PR');
       if (!String(p.delivery_place || '').trim()) fail('Nhập nơi nhận hàng');
+      if (!String(p.receiver_name || '').trim() || !String(p.receiver_phone || '').trim()) fail('Nhập tên và số điện thoại người nhận hàng');
       if (!p.need_date) fail('Thiếu ngày cần hàng');
       if (p.need_date < todayISO()) fail(`Ngày cần hàng ${fmtD(p.need_date)} đã qua`);
       const base = nextPrBase(site.id, cat); const no = base + '.R1';
       const pr = { id: uid(), pr_no: no, base_no: base, revision: 1, category: cat, title: String(p.title || '').trim().slice(0, 200) || no, site_id: site.id, requested_by: u.id,
-                   need_date: p.need_date, delivery_place: p.delivery_place.trim(), note: p.note || null, status: 'cho_duyet', source: 'html', approved_by: null, approved_at: null,
+                   need_date: p.need_date, delivery_place: p.delivery_place.trim(), receiver_name: p.receiver_name.trim(), receiver_phone: p.receiver_phone.trim(), note: p.note || null, status: 'cho_duyet', source: 'html', approved_by: null, approved_at: null,
                    reject_reason: null, created_at: now(), updated_at: now() };
       db.prs.push(pr);
       const out = insertItems(u, pr, p.items, 'html');
@@ -361,6 +362,7 @@ export function DemoBackend() {
       if (['cho_duyet', 'tu_choi'].includes(pr.status)) recall(u, pr, 'sửa PR');
       else if (pr.status !== 'thu_hoi') fail('Hãy thu hồi PR trước khi sửa');
       if (!String(p.delivery_place || '').trim()) fail('Nhập nơi nhận hàng');
+      if (!String(p.receiver_name || '').trim() || !String(p.receiver_phone || '').trim()) fail('Nhập tên và số điện thoại người nhận hàng');
       if (!p.need_date) fail('Thiếu ngày cần hàng');
       if (p.need_date < todayISO()) fail(`Ngày cần hàng ${fmtD(p.need_date)} đã qua`);
       const oldNo = pr.pr_no;
@@ -368,10 +370,19 @@ export function DemoBackend() {
       const out = insertItems(u, pr, p.items, 'html');
       const base = pr.base_no || pr.pr_no.replace(/\.R\d+$/, ''); const rev = (pr.revision || 1) + 1; const no = `${base}.R${rev}`;
       Object.assign(pr, { pr_no: no, base_no: base, revision: rev, need_date: p.need_date, title: String(p.title || '').trim().slice(0, 200) || no, note: p.note || null,
-                          delivery_place: p.delivery_place.trim(), status: 'cho_duyet', reject_reason: null, updated_at: now() });
+                          delivery_place: p.delivery_place.trim(), receiver_name: p.receiver_name.trim(), receiver_phone: p.receiver_phone.trim(), status: 'cho_duyet', reject_reason: null, updated_at: now() });
       attachFiles(u, pr, p.attachments);
       log(pr.id, null, u.id, 'sua_pr', oldNo, no);
       return { id: pr.id, pr_no: no, title: pr.title, site: db.sites.find(x => x.id === pr.site_id).code, need_date: pr.need_date, status: pr.status, items: out, images: (p.attachments || []).length };
+    }),
+    upsertWorkCategory: w => tx(() => {
+      req(['procurement', 'admin']);
+      const code = String(w.code || '').replace(/\s/g, '').toUpperCase();
+      if (!/^[A-Z0-9]{1,6}$/.test(code)) fail('Mã hạng mục gồm 1–6 chữ in hoa hoặc số, vd: MEP');
+      if (!String(w.name || '').trim()) fail('Nhập tên hạng mục');
+      const x = db.workCats.find(y => y.code === code); const vals = { code, name: w.name.trim(), sort: Number(w.sort ?? 100), active: w.active !== false };
+      if (x) Object.assign(x, vals); else db.workCats.push(vals);
+      return null;
     }),
     upsertSite: st => tx(() => {
       req(['procurement', 'admin']);

@@ -201,3 +201,6 @@ fieldset.issues label.disabled{opacity:.5;cursor:not-allowed}
 .prcode{font-size:13px}
 .prcode b{font-size:15px;color:var(--primary)}
 .sites-table{min-width:860px}
+.order-table{min-width:1140px}
+.order-table .c-code{width:110px;white-space:nowrap}
+.new-code{color:var(--info);font-weight:600}

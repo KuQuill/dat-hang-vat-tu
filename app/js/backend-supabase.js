@@ -28,10 +28,11 @@ export function SupaBackend() {
     async changePassword(pw) { const { error } = await sb.auth.updateUser({ password: pw }); if (error) throw toErr(error); },
 
     async pull(since) {
-      const [sites, groups, subgroups, materials, profiles, stock, assets, proposals, lines, links, prs, items, atts] = await Promise.all([
+      const [sites, groups, subgroups, workCats, materials, profiles, stock, assets, proposals, lines, links, prs, items, atts] = await Promise.all([
         all('sites', '*', q => q.order('code')),
         all('material_groups', '*', q => q.order('priority')),
         all('material_subgroups', '*', q => q.order('name')),
+        all('work_categories', '*', q => q.order('sort')),
         all('materials', 'id,code,name,spec,unit,group_code,subgroup_id,image_path,is_new,active', q => q.order('code')),
         all('profiles', 'id,email,full_name,phone,role,site_id,active', q => q.order('full_name')),
         all('stock', '*'),
@@ -61,7 +62,7 @@ export function SupaBackend() {
           deliveries = deliveries.concat(await all('pr_deliveries', '*', q => q.in('item_id', chunk)));
         }
       }
-      return { sites, groups, subgroups, materials, profiles, stock, assets, proposals, lines, links, prs, items, atts, deliveries, changedItems, changedPrs, full: !since.pr };
+      return { sites, groups, subgroups, workCats, materials, profiles, stock, assets, proposals, lines, links, prs, items, atts, deliveries, changedItems, changedPrs, full: !since.pr };
     },
     async assetHistory(id) {
       const { data, error } = await sb.from('asset_history').select('*').eq('asset_id', id).order('created_at', { ascending: false }).limit(200);
@@ -80,9 +81,12 @@ export function SupaBackend() {
     },
 
     createPR: p => rpc('create_pr', { p_site_code: p.site_code, p_category: p.category, p_need_date: p.need_date, p_items: p.items, p_title: p.title || null,
-                                      p_note: p.note || null, p_delivery_place: p.delivery_place || null, p_attachments: p.attachments || null }),
+                                      p_note: p.note || null, p_delivery_place: p.delivery_place || null, p_attachments: p.attachments || null,
+                                      p_receiver_name: p.receiver_name || null, p_receiver_phone: p.receiver_phone || null }),
     updatePR: (pr, p) => rpc('update_pr', { p_pr: pr, p_need_date: p.need_date, p_items: p.items, p_title: p.title || null,
-                                      p_note: p.note || null, p_delivery_place: p.delivery_place || null, p_attachments: p.attachments || null }),
+                                      p_note: p.note || null, p_delivery_place: p.delivery_place || null, p_attachments: p.attachments || null,
+                                      p_receiver_name: p.receiver_name || null, p_receiver_phone: p.receiver_phone || null }),
+    upsertWorkCategory: w => rpc('upsert_work_category', { p_code: w.code, p_name: w.name, p_sort: w.sort ?? 100, p_active: w.active !== false }),
     recallPR: (pr, reason) => rpc('recall_pr', { p_pr: pr, p_reason: reason || null }),
     upsertSite: s => rpc('upsert_site', { p_id: s.id || null, p_code: s.code, p_name: s.name, p_address: s.address || null, p_manager: s.manager || null, p_active: s.active !== false }),
     addAttachments: (pr, files) => rpc('add_attachments', { p_pr: pr, p_files: files }),

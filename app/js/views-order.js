@@ -7,8 +7,8 @@ import { S, ctx, ACT, VIEWS, INPUTS, KEY, LS, IDB, DEMO, CONFIG, hooks, $, $$, e
 const newRow = () => ({ key: uid(), name: '', spec: '', unit: '', qty: '', note: '', group: '', material_id: null, code: null, force_new: false });
 function loadDraft() {
   const d = LS.get(KEY.draft, null);
-  S.draft = d && Array.isArray(d.rows) ? d : { title: '', site_code: '', category: '', need_date: '', delivery_place: '', note: '', rows: [], editing: null };
-  for (const k of ['title', 'category', 'delivery_place']) if (S.draft[k] == null) S.draft[k] = '';
+  S.draft = d && Array.isArray(d.rows) ? d : { title: '', site_code: '', category: '', need_date: '', delivery_place: '', receiver_name: '', receiver_phone: '', note: '', rows: [], editing: null };
+  for (const k of ['title', 'category', 'delivery_place', 'receiver_name', 'receiver_phone']) if (S.draft[k] == null) S.draft[k] = '';
   if (S.draft.editing === undefined) S.draft.editing = null;
   if (!S.draft.rows.length) S.draft.rows = [newRow(), newRow(), newRow()];
 }
@@ -37,7 +37,6 @@ VIEWS.info = {
         <div class="form">
           <label class="f full"><span class="req">Dự án / công trường</span><select data-h="site_code" ${d.editing ? 'disabled' : ''}>${siteOptions(d.site_code, '— Chọn dự án —')}</select></label>
           ${s ? `<dl class="kv full"><dt>Địa chỉ</dt><dd>${esc(s.address || '—')}</dd><dt>Chỉ huy trưởng</dt><dd>${esc(s.manager || '—')}</dd></dl>` : ''}
-          <label class="f"><span class="req">Ngày cần hàng</span><input type="date" data-h="need_date" min="${todayISO()}" value="${esc(d.need_date)}"></label>
           <label class="f full">Ghi chú cho phòng vật tư<textarea data-h="note" rows="2">${esc(d.note)}</textarea></label>
         </div>
         <div class="toolbar mt"><span class="muted small">Tự động lưu nháp trên máy</span><span class="spacer"></span>
@@ -119,14 +118,16 @@ function rowStatus(r) {
     if (best) return `<span class="badge b-amber">≈ Gần giống</span> <button class="linkbtn" data-act="pick-best" data-key="${r.key}" data-id="${best.m.id}">${esc(best.m.code)} ${esc(best.m.name)}</button>
       <div class="small muted">hoặc <button class="linkbtn" data-act="force-new" data-key="${r.key}">tạo mã mới</button></div>`;
   }
-  return `<span class="badge b-blue">🆕 Mã mới</span>
-    <div class="grp"><select data-f="group" aria-label="Nhóm vật tư">${groupOptions(r.group)}</select></div><div class="small" data-av>${availText(r)}</div>`;
+  const g = r.group || guessGroup(r.name + ' ' + r.spec); const gg = S.groups.find(x => x.code === g);
+  return `<span class="badge b-blue">🆕 Mã mới tự động</span>
+    <div class="grp"><select data-f="group" aria-label="Nhóm vật tư">${groupOptions(r.group, `Tự đoán: ${g}${gg ? ' — ' + gg.name : ''}`)}</select></div><div class="small" data-av>${availText(r)}</div>`;
 }
 function rowHTML(r, i) {
   const locked = !!r.material_id;
   const nImg = S.draftImages.filter(im => im.row === r.key).length;
   return `<tr data-row="${r.key}">
     <td class="c-idx">${i + 1}</td>
+    <td class="c-code mono" data-code="${r.key}">${codeCell(r)}</td>
     <td class="c-name"><input data-f="name" value="${esc(r.name)}" placeholder="Gõ tên hoặc mã vật tư…" autocomplete="off"></td>
     <td class="c-spec"><input data-f="spec" value="${esc(r.spec)}" ${locked ? 'readonly' : ''}></td>
     <td class="c-unit"><input data-f="unit" value="${esc(r.unit)}" ${locked ? 'readonly' : ''}></td>
@@ -153,20 +154,22 @@ VIEWS.order = {
         ${ed ? `<div class="edit-banner">✏ Đang sửa <b class="mono">${esc(ed.pr_no)}</b> — gửi lại sẽ thành <b class="mono">${esc(ed.base_no)}.R${ed.revision + 1}</b> và chờ duyệt lại.
           <button class="btn sm" data-act="cancel-edit">Huỷ sửa</button></div>` : ''}
         <div class="form">
-          <label class="f"><span class="req">Hạng mục</span><select data-h="category" ${ed ? 'disabled' : ''}>${catOptions(d.category)}</select></label>
-          <label class="f"><span class="req">Nơi nhận hàng</span><input data-h="delivery_place" value="${esc(d.delivery_place)}" placeholder="vd: Kho tạm cổng số 2 — anh Hùng 0901…"></label>
+          <label class="f"><span class="req">Hạng mục thi công</span><select data-h="category" ${ed ? 'disabled' : ''}>${catOptions(d.category)}</select></label>
+          <label class="f"><span class="req">Ngày cần có hàng</span><input type="date" data-h="need_date" min="${todayISO()}" value="${esc(d.need_date)}"></label>
+          <label class="f full"><span class="req">Nơi nhận hàng</span><input data-h="delivery_place" value="${esc(d.delivery_place)}" placeholder="vd: Kho tạm cổng số 2, dự án SSD"></label>
+          <label class="f"><span class="req">Người nhận hàng</span><input data-h="receiver_name" value="${esc(d.receiver_name)}" placeholder="Họ tên người nhận"></label>
+          <label class="f"><span class="req">SĐT người nhận</span><input data-h="receiver_phone" value="${esc(d.receiver_phone)}" inputmode="tel" placeholder="vd: 0901 234 567"></label>
           <label class="f full">Diễn giải (không bắt buộc)<input data-h="title" value="${esc(d.title)}" maxlength="200" placeholder="vd: Ống cấp nước tầng 3"></label>
         </div>
         <div class="prcode mt">Số PR: <b class="mono" id="pr-code">${esc(prCodePreview())}</b></div>
         <div class="toolbar mt">
           <div class="small">Dự án: <b>${s ? esc(s.code + ' — ' + s.name) : '<span class="late-text">chưa chọn</span>'}</b>
-            &nbsp;·&nbsp; Cần ngày: <b>${d.need_date ? esc(fmtD(d.need_date)) : '<span class="late-text">chưa chọn</span>'}</b>
-            &nbsp;<button class="linkbtn" data-act="tab" data-tab="info">Sửa</button></div>
+            &nbsp;<button class="linkbtn" data-act="tab" data-tab="info">Đổi dự án</button></div>
           <span class="spacer"></span><span class="small muted">✓ có trong kho · ≈ gần giống · 🆕 mã mới · 🛒 cần mua mới</span>
         </div>
       </section>
       <div class="table-wrap"><table class="order-table">
-        <thead><tr><th>#</th><th>Vật tư <span class="req"></span></th><th>Quy cách</th><th>ĐVT</th><th class="right">Số lượng <span class="req"></span></th><th>Ghi chú</th><th>Mã / tồn kho tổng</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Mã vật tư</th><th>Tên vật tư <span class="req"></span></th><th>Quy cách</th><th>ĐVT</th><th class="right">Số lượng <span class="req"></span></th><th>Ghi chú</th><th>Mã / tồn kho tổng</th><th></th></tr></thead>
         <tbody id="rows">${d.rows.map(rowHTML).join('')}</tbody>
       </table></div>
       <div class="toolbar mt">
@@ -198,7 +201,7 @@ function pickMaterial(key, id) {
   const r = S.draft.rows.find(x => x.key === key); const m = D().mat.get(id);
   if (!r || !m) return;
   Object.assign(r, { material_id: m.id, code: m.code, name: m.name, spec: m.spec || '', unit: m.unit, force_new: false, group: '' });
-  saveDraft(); refreshRow(key);
+  saveDraft(); refreshRow(key); refreshCodes();
   const q = $(`tr[data-row="${key}"] [data-f="qty"]`); if (q) q.focus();
 }
 
@@ -249,7 +252,7 @@ INPUTS.push(e => {
       if (e.type === 'input') showAC(t, r.key);
     } else r[f] = t.value;
     saveDraft();
-    if (f === 'name' || f === 'spec') refreshRowStatus(r.key);
+    if (f === 'name' || f === 'spec' || f === 'group') { if (f !== 'group') refreshRowStatus(r.key); refreshCodes(); }
     if (f === 'qty') refreshAvail(r.key);
     return true;
   }
@@ -296,10 +299,13 @@ async function pasteFromExcel() {
 async function submitOrder() {
   const d = S.draft; const errs = [];
   if (!siteByCode(d.site_code)) errs.push('Chưa chọn dự án / công trường (Sheet 1)');
-  if (!d.category) errs.push('Chưa chọn hạng mục');
+  if (!d.category) errs.push('Chưa chọn hạng mục thi công');
   if (!d.delivery_place.trim()) errs.push('Chưa nhập nơi nhận hàng');
-  if (!d.need_date) errs.push('Chưa chọn ngày cần hàng (Sheet 1)');
-  else if (d.need_date < todayISO()) errs.push('Ngày cần hàng đã qua (Sheet 1)');
+  if (!d.receiver_name.trim()) errs.push('Chưa nhập tên người nhận hàng');
+  if (!d.receiver_phone.trim()) errs.push('Chưa nhập số điện thoại người nhận');
+  else if (!/^[0-9 +().-]{8,20}$/.test(d.receiver_phone.trim())) errs.push('Số điện thoại người nhận không hợp lệ');
+  if (!d.need_date) errs.push('Chưa chọn ngày cần có hàng');
+  else if (d.need_date < todayISO()) errs.push('Ngày cần có hàng đã qua');
   const rows = d.rows.filter(r => r.name.trim() || String(r.qty).trim());
   if (!rows.length) errs.push('Chưa có dòng vật tư nào');
   rows.forEach((r, i) => {
@@ -338,7 +344,7 @@ async function submitOrder() {
   if (noUnit.length) return showErrs(noUnit);
 
   const payload = {
-    title: d.title.trim(), site_code: d.site_code, category: d.category, need_date: d.need_date, note: d.note, delivery_place: d.delivery_place.trim(),
+    title: d.title.trim(), site_code: d.site_code, category: d.category, need_date: d.need_date, note: d.note, delivery_place: d.delivery_place.trim(), receiver_name: d.receiver_name.trim(), receiver_phone: d.receiver_phone.trim(),
     items: rows.map(r => r.material_id
       ? { material_id: r.material_id, qty: parseNum(r.qty), unit: r.unit.trim() || null, note: r.note.trim() || null }
       : { name: r.name.trim(), spec: r.spec.trim() || null, unit: r.unit.trim(), group: r.group || null, qty: parseNum(r.qty), note: r.note.trim() || null, force_new: !!r.force_new }),
@@ -362,8 +368,9 @@ async function submitOrder() {
           <td class="right">${fmtN(it.qty)}</td><td>${esc(it.unit)}</td>
           <td class="small">${free >= it.qty ? '<span class="ok-text">Đủ</span>' : `<span class="warn-text">Cần mua ${fmtN(it.qty - free)}</span>`}</td></tr>`; }).join('')}
         </tbody></table></div>`,
-      actions: [{ label: 'Đặt đơn khác', value: 'new' }, { label: 'Xem ở Theo dõi', value: 'track', primary: true }],
+      actions: [{ label: 'Đặt đơn khác', value: 'new' }, { label: '⬇ Xuất PDF để ký', value: 'pdf' }, { label: 'Xem ở Theo dõi', value: 'track', primary: true }],
     });
+    if (action === 'pdf' && ACT['pr-pdf']) ACT['pr-pdf']({ dataset: { id: res.id } });
     if (action === 'track') { S.tab = 'track'; S.filters = { ...S.filters, q: res.pr_no, status: '', kpi: '' }; LS.set(KEY.tab, S.tab); hooks.render(); }
   } catch (e) {
     if (isNet(e) && !d.editing) {
@@ -384,15 +391,46 @@ async function clearDraftAfterSend() {
   S.draftImages.forEach(im => im._url && URL.revokeObjectURL(im._url)); S.draftImages = []; await IDB.del(KEY.draftImgs);
 }
 
+// Đoán nhóm vật tư theo từ khoá (giống máy chủ) → dùng để hiện mã mới dự kiến
+function guessGroup(q) {
+  const n = ' ' + norm(q) + ' ';
+  for (const g of [...S.groups].filter(g => g.active !== false).sort((a, b) => a.priority - b.priority))
+    if ((g.keywords || []).some(k => n.includes(' ' + k + ' '))) return g.code;
+  return 'K';
+}
+// Mã mới dự kiến cho các dòng vật tư chưa có trong kho (đánh số tiếp theo trong nhóm)
+function predictedCodes() {
+  const out = new Map(); const next = new Map();
+  for (const r of S.draft.rows) {
+    if (r.material_id || !r.name.trim()) continue;
+    if (!r.force_new && matchMaterials(r.name + ' ' + r.spec, 1, MATCH).length) continue;
+    const g = r.group || guessGroup(r.name + ' ' + r.spec);
+    if (!next.has(g)) {
+      let mx = Number((S.groups.find(x => x.code === g) || {}).seq) || 0;
+      for (const m of S.materials) if (m.code.startsWith(g + '-')) mx = Math.max(mx, parseInt(m.code.slice(g.length + 1), 10) || 0);
+      next.set(g, mx);
+    }
+    next.set(g, next.get(g) + 1);
+    out.set(r.key, `${g}-${String(next.get(g)).padStart(4, '0')}`);
+  }
+  return out;
+}
+function codeCell(r, pc) {
+  if (r.material_id) { const m = D().mat.get(r.material_id); return `<b>${esc(m ? m.code : r.code || '')}</b>`; }
+  const c = (pc || predictedCodes()).get(r.key);
+  return c ? `<span class="new-code" title="Mã tự động cấp khi gửi PR">🆕 ${esc(c)}</span><div class="small muted">dự kiến</div>` : '<span class="muted">—</span>';
+}
+function refreshCodes() { const pc = predictedCodes(); for (const r of S.draft.rows) { const el = $(`[data-code="${r.key}"]`); if (el) el.innerHTML = codeCell(r, pc); } }
+
 function catOptions(sel) {
-  return '<option value="">— Chọn hạng mục —</option>' + S.groups.filter(g => g.active !== false)
+  return '<option value="">— Chọn hạng mục thi công —</option>' + (S.workCats || []).filter(g => g.active !== false || g.code === sel)
     .map(g => `<option value="${esc(g.code)}" ${g.code === sel ? 'selected' : ''}>${esc(g.code)} — ${esc(g.name)}</option>`).join('');
 }
 function prCodePreview() {
   const d = S.draft;
   if (d.editing) return `${d.editing.base_no}.R${d.editing.revision + 1} (sau khi gửi lại)`;
   const s = siteByCode(d.site_code);
-  if (!s || !d.category) return 'chọn dự án và hạng mục để tạo số PR';
+  if (!s || !d.category) return 'chọn dự án và hạng mục thi công để tạo số PR';
   const prefix = `${s.code}.${d.category}.PR`.toUpperCase();
   let n = 0;
   for (const p of S.prs) { const b = (p.base_no || '').toUpperCase(); if (b.startsWith(prefix)) n = Math.max(n, parseInt(b.slice(prefix.length), 10) || 0); }
@@ -404,7 +442,7 @@ function loadPRForEdit(prId) {
   const site = siteById(pr.site_id) || {};
   const its = S.items.filter(i => i.pr_id === pr.id).sort((a, b) => a.line_no - b.line_no);
   S.draft = { title: pr.title && pr.title !== pr.pr_no ? pr.title : '', site_code: site.code || '', category: pr.category || '', need_date: pr.need_date < todayISO() ? '' : pr.need_date,
-    delivery_place: pr.delivery_place || '', note: pr.note || '',
+    delivery_place: pr.delivery_place || '', receiver_name: pr.receiver_name || '', receiver_phone: pr.receiver_phone || '', note: pr.note || '',
     editing: { id: pr.id, pr_no: pr.pr_no, base_no: pr.base_no || pr.pr_no.replace(/\.R\d+$/, ''), revision: pr.revision || 1 },
     rows: its.map(i => { const m = D().mat.get(i.material_id) || {}; return Object.assign(newRow(), { material_id: i.material_id, code: m.code, name: m.name || '', spec: m.spec || '', unit: i.unit, qty: String(i.qty), note: i.note || '' }); }) };
   if (!S.draft.rows.length) S.draft.rows = [newRow()];
@@ -434,12 +472,12 @@ Object.assign(ACT, {
   'del-img': b => { const im = S.draftImages.find(x => x.id === b.dataset.id); S.draftImages = S.draftImages.filter(x => x.id !== b.dataset.id); saveDraftImages(); refreshDraftThumbs(); if (im && im.row) refreshRow(im.row); },
   'view-local': b => { const im = S.draftImages.find(x => x.id === b.dataset.id); if (im) modal({ title: im.name, wide: true, body: `<img class="viewer" src="${imgURL(im)}" alt="">`, actions: [{ label: 'Đóng', value: null }] }); },
   'pick-best': b => pickMaterial(b.dataset.key, b.dataset.id),
-  'force-new': b => { const r = S.draft.rows.find(x => x.key === b.dataset.key); if (r) { r.force_new = true; saveDraft(); refreshRowStatus(r.key); } },
+  'force-new': b => { const r = S.draft.rows.find(x => x.key === b.dataset.key); if (r) { r.force_new = true; saveDraft(); refreshRowStatus(r.key); refreshCodes(); } },
   submit: () => submitOrder(),
   'ob-edit': async b => {
     const o = S.outbox.find(x => x.id === b.dataset.id); if (!o) return;
     const p = o.payload;
-    S.draft = { title: p.title || '', site_code: p.site_code, category: p.category || '', editing: null, need_date: p.need_date, delivery_place: p.delivery_place || '', note: p.note || '',
+    S.draft = { title: p.title || '', site_code: p.site_code, category: p.category || '', editing: null, need_date: p.need_date, delivery_place: p.delivery_place || '', receiver_name: p.receiver_name || '', receiver_phone: p.receiver_phone || '', note: p.note || '',
       rows: p.items.map(it => { const r = newRow(); const m = it.material_id && D().mat.get(it.material_id);
         return Object.assign(r, m ? { material_id: m.id, code: m.code, name: m.name, spec: m.spec || '', unit: it.unit || m.unit } : { name: it.name || '', spec: it.spec || '', unit: it.unit || '', group: it.group || '', force_new: !!it.force_new },
           { qty: String(it.qty ?? ''), note: it.note || '' }); }) };

@@ -7,20 +7,21 @@ import './views-track.js';
 import './views-kho.js';
 import './views-purchase.js';
 import './views-sites.js';
+import './pdf.js';
 import './views-users.js';
 
 /* ---------- Bộ đệm & đồng bộ ---------- */
 const stripMat = m => { const { _n, _tg, _tok, _code, ...x } = m; return x; };
 function saveCache() {
   const ok = LS.set(KEY.cache, { uid: S.user && S.user.id, sync: S.sync, lastSync: S.lastSync,
-    sites: S.sites, groups: S.groups, subgroups: S.subgroups, materials: S.materials.map(stripMat), profiles: S.profiles, stock: S.stock, assets: S.assets,
+    sites: S.sites, groups: S.groups, subgroups: S.subgroups, workCats: S.workCats, materials: S.materials.map(stripMat), profiles: S.profiles, stock: S.stock, assets: S.assets,
     proposals: S.proposals, lines: S.lines, links: S.links, prs: S.prs, items: S.items, deliveries: S.deliveries, atts: S.atts });
   if (!ok) console.warn('Không lưu được bộ đệm (localStorage đầy?)');
 }
 function loadCache() {
   const c = LS.get(KEY.cache, null);
   if (!c || !c.sync || (S.user && c.uid && c.uid !== S.user.id)) return;
-  for (const k of ['sites', 'groups', 'subgroups', 'materials', 'profiles', 'stock', 'assets', 'proposals', 'lines', 'links', 'prs', 'items', 'deliveries', 'atts']) S[k] = c[k] || [];
+  for (const k of ['sites', 'groups', 'subgroups', 'workCats', 'materials', 'profiles', 'stock', 'assets', 'proposals', 'lines', 'links', 'prs', 'items', 'deliveries', 'atts']) S[k] = c[k] || [];
   S.sync = c.sync; S.lastSync = c.lastSync; S.ver++;
   S.profile = S.profiles.find(p => p.id === (S.user && S.user.id)) || null;
 }
@@ -29,7 +30,7 @@ const maxTs = (arr, f, cur) => arr.reduce((m, x) => (x[f] && (!m || x[f] > m) ? 
 
 async function pull(full = false) {
   const d = await ctx.B.pull(full ? { pr: null, item: null, att: null } : S.sync);
-  for (const k of ['sites', 'groups', 'subgroups', 'materials', 'profiles', 'stock', 'assets', 'proposals', 'lines', 'links']) S[k] = d[k];
+  for (const k of ['sites', 'groups', 'subgroups', 'workCats', 'materials', 'profiles', 'stock', 'assets', 'proposals', 'lines', 'links']) S[k] = d[k] || [];
   if (d.full) {
     S.prs = d.prs; S.items = d.items; S.atts = d.atts; S.deliveries = d.deliveries;
     S.sync = { pr: maxTs(d.prs, 'updated_at', null), item: maxTs(d.items, 'updated_at', null), att: maxTs(d.atts, 'created_at', null) };

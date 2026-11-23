@@ -79,7 +79,7 @@ export const MAX_IMG_PER_PR = 10;
 /* ---------- Trạng thái ---------- */
 export const S = {
   user: null, profile: null,
-  sites: [], groups: [], subgroups: [], materials: [], profiles: [], stock: [], assets: [],
+  sites: [], groups: [], subgroups: [], workCats: [], materials: [], profiles: [], stock: [], assets: [],
   prs: [], items: [], deliveries: [], atts: [], proposals: [], lines: [], links: [],
   sync: { pr: null, item: null, att: null }, lastSync: null, syncing: false, ver: 0,
   outbox: LS.get(KEY.outbox, []),

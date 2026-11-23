@@ -255,7 +255,7 @@ function prDetailHTML(p) {
   }).join('');
 
   return `<div class="toolbar mb">
-      <div><b class="mono">${esc(p.pr_no)}</b>${p.title && p.title !== p.pr_no ? ` — <b>${esc(p.title)}</b>` : ''}<div class="small muted">${p.delivery_place ? `📍 Nơi nhận: ${esc(p.delivery_place)} · ` : ''}${p.note ? `📝 ${esc(p.note)} · ` : ''}Nguồn: ${p.source === 'bot' ? 'Bot Telegram' : 'Web app'}
+      <div><b class="mono">${esc(p.pr_no)}</b>${p.title && p.title !== p.pr_no ? ` — <b>${esc(p.title)}</b>` : ''}<div class="small muted">${p.delivery_place ? `📍 Nơi nhận: ${esc(p.delivery_place)}${p.receiver_name ? ` — ${esc(p.receiver_name)}${p.receiver_phone ? ' ' + esc(p.receiver_phone) : ''}` : ''} · ` : ''}${p.note ? `📝 ${esc(p.note)} · ` : ''}Nguồn: ${p.source === 'bot' ? 'Bot Telegram' : 'Web app'}
         ${p.approved_by ? ` · ${p.status === 'tu_choi' ? 'Từ chối' : 'Duyệt'} bởi ${esc(profName(p.approved_by))} lúc ${esc(fmtDT(p.approved_at))}` : ''}
         ${p.reject_reason ? ` · <span class="late-text">Lý do: ${esc(p.reject_reason)}</span>` : ''}</div></div>
       <span class="spacer"></span>
@@ -263,6 +263,7 @@ function prDetailHTML(p) {
       ${editable && p.status !== 'da_ve' ? `<button class="btn sm" data-act="bulk" data-pr="${esc(p.pr_no)}">Cập nhật nhanh cả phiếu…</button>` : ''}
       ${canRecall ? `<button class="btn sm" data-act="recall" data-pr="${esc(p.pr_no)}" data-id="${p.id}" title="Thu hồi để sửa khi đặt nhầm">↩ Thu hồi & sửa</button>` : ''}
       ${p.status === 'thu_hoi' && (owner || staff) ? `<button class="btn sm primary" data-act="load-pr-edit" data-id="${p.id}">✏ Tiếp tục sửa</button>` : ''}
+      <button class="btn sm" data-act="pr-pdf" data-id="${p.id}" title="Xuất phiếu đề nghị PDF để ký">⬇ Xuất PDF</button>
       ${canAddImg ? `<button class="btn sm" data-act="pr-add-img" data-pr="${esc(p.pr_no)}">📷 Thêm ảnh</button>` : ''}
       ${canCancel ? `<button class="btn sm danger" data-act="cancel" data-pr="${esc(p.pr_no)}">Huỷ phiếu</button>` : ''}
     </div>
