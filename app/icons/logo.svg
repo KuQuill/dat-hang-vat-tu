@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Mekocons E&amp;C">
+  <defs>
+    <clipPath id="tri"><path d="M50 5 L95 93 L5 93 Z"/></clipPath>
+  </defs>
+  <g clip-path="url(#tri)">
+    <rect width="100" height="100" fill="#556130"/>
+    <rect y="0" width="100" height="27" fill="#9a9e8a"/>
+    <g fill="none" stroke="#7d8744" stroke-width="2.2" stroke-linecap="round">
+      <path d="M0 40 C25 34 45 44 70 38 S95 36 100 34"/>
+      <path d="M0 52 C22 46 48 58 72 50 S96 48 100 47"/>
+      <path d="M0 65 C26 58 46 70 70 63 S94 60 100 60"/>
+      <path d="M0 78 C24 72 50 84 74 76 S96 74 100 73"/>
+    </g>
+    <path d="M58 24 C40 30 36 44 50 52 C64 60 62 76 40 90" fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+  </g>
+</svg>

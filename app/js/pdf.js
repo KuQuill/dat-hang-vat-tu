@@ -11,7 +11,7 @@ const loadLib = () => lib || (lib = new Promise((res, rej) => {
 }));
 
 const cell = 'border:1px solid #444;padding:5px 6px;vertical-align:top;color:#000;background:#fff;text-align:left;font-size:12.5px;';
-const head = cell + 'background:#e8e8e8;font-weight:700;';
+const head = cell + 'background:#e9ecdd;font-weight:700;';
 export function docHTML(pr) {
   const dd = D(); const site = siteById(pr.site_id) || {};
   const wc = (S.workCats || []).find(w => w.code === pr.category);
@@ -32,7 +32,8 @@ export function docHTML(pr) {
       <div style="height:78px"></div><div style="font-weight:600">${esc(name || '')}</div></td>`;
   return `<div style="font-family:'Times New Roman',Times,serif;font-size:13px;color:#000;background:#fff;width:190mm;padding:2mm">
     <table style="width:100%;border-collapse:collapse"><tr>
-      <td style="vertical-align:top"><div style="font-weight:700;font-size:14px;text-transform:uppercase">${esc(CONFIG.COMPANY)}</div>
+      <td style="vertical-align:top;width:62px"><img src="${new URL('icons/logo.svg', location.href).href}" alt="" style="width:54px;height:54px;display:block"></td>
+      <td style="vertical-align:top"><div style="font-weight:700;font-size:15px;color:#44502a">${esc(CONFIG.COMPANY)}</div>
         <div style="font-size:12px">Dự án: ${esc(site.name || site.code || '')}</div></td>
       <td style="vertical-align:top;text-align:right;font-size:12px">Số: <b style="font-size:14px">${esc(pr.pr_no)}</b><br>Ngày lập: ${esc(fmtD(vnDate(pr.created_at)))}
         ${(pr.revision || 1) > 1 ? `<br>Lần sửa: R${pr.revision}` : ''}</td></tr></table>
@@ -40,7 +41,7 @@ export function docHTML(pr) {
     <div style="text-align:center;font-style:italic;margin-bottom:12px">(Purchase Request)</div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:10px">${info.map(([k, v]) => `<tr><td style="width:34%;padding:3px 0;color:#222">${k}:</td><td style="padding:3px 0">${v}</td></tr>`).join('')}</table>
     <table style="width:100%;border-collapse:collapse;font-size:12.5px">
-      <thead><tr style="background:#eee">
+      <thead><tr style="background:#e9ecdd">
         <th style="${head}width:6%">STT</th><th style="${head}width:14%">Mã vật tư</th><th style="${head}">Tên vật tư</th><th style="${head}width:16%">Quy cách</th>
         <th style="${head}width:8%">ĐVT</th><th style="${head}width:10%;text-align:right">Số lượng</th><th style="${head}width:16%">Ghi chú</th></tr></thead>
       <tbody>${its.map(i => { const m = dd.mat.get(i.material_id) || {}; return `<tr style="page-break-inside:avoid">

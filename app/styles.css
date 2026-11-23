@@ -1,27 +1,11 @@
 :root{
-  --bg:#f4f6f9; --surface:#ffffff; --surface-2:#f0f3f7; --border:#dde2e9; --text:#1c2430; --muted:#5d6979;
-  --primary:#1f6feb; --primary-ink:#ffffff; --primary-soft:#e3edff;
-  --ok:#1a7f37; --ok-bg:#dcf6e3; --warn:#8a5d00; --warn-bg:#fff2cc; --danger:#c62832; --danger-bg:#ffe4e6;
-  --info:#0969da; --info-bg:#dcefff; --violet:#6136b8; --violet-bg:#ece4ff; --teal:#0a736f; --teal-bg:#d3f3f0;
-  --gray:#57606a; --gray-bg:#e8ecf0; --batch:#f8fafc;
-  --shadow:0 1px 2px rgba(16,24,40,.05),0 4px 14px rgba(16,24,40,.06); --radius:10px;
+  --bg:#f6f7f2; --surface:#ffffff; --surface-2:#f0f2e8; --border:#dadfcb; --text:#1f2416; --muted:#5e6650;
+  --primary:#44502a; --primary-hover:#353f20; --primary-ink:#ffffff; --primary-soft:#e9ecdd; --accent:#6b7533;
+  --ok:#2f6b1f; --ok-bg:#e1f0d6; --warn:#8a5d00; --warn-bg:#fff2cc; --danger:#b4282e; --danger-bg:#fbe3e3;
+  --info:#3f5f6e; --info-bg:#e2edf0; --violet:#5f4b8b; --violet-bg:#ece7f6; --teal:#2f6f5e; --teal-bg:#dcefe8;
+  --gray:#5e6650; --gray-bg:#eceee4; --batch:#fafbf6;
+  --shadow:0 1px 2px rgba(40,48,20,.05),0 4px 14px rgba(40,48,20,.07); --radius:10px;
   color-scheme: light;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#0e1318; --surface:#161c23; --surface-2:#1d242d; --border:#2c3540; --text:#e6edf3; --muted:#9aa6b3;
-    --primary:#4d8dff; --primary-ink:#0b1220; --primary-soft:#14284a;
-    --ok:#46c25c; --ok-bg:#12331c; --warn:#e0a82e; --warn-bg:#382a0b; --danger:#ff6b70; --danger-bg:#3b1519;
-    --info:#5aa8ff; --info-bg:#0f2944; --violet:#b597f5; --violet-bg:#291d45; --teal:#3fc8bd; --teal-bg:#0c2f2c;
-    --gray:#9aa6b3; --gray-bg:#242c35; --batch:#1a2028; --shadow:0 1px 2px rgba(0,0,0,.4); color-scheme: dark;
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#0e1318; --surface:#161c23; --surface-2:#1d242d; --border:#2c3540; --text:#e6edf3; --muted:#9aa6b3;
-  --primary:#4d8dff; --primary-ink:#0b1220; --primary-soft:#14284a;
-  --ok:#46c25c; --ok-bg:#12331c; --warn:#e0a82e; --warn-bg:#382a0b; --danger:#ff6b70; --danger-bg:#3b1519;
-  --info:#5aa8ff; --info-bg:#0f2944; --violet:#b597f5; --violet-bg:#291d45; --teal:#3fc8bd; --teal-bg:#0c2f2c;
-  --gray:#9aa6b3; --gray-bg:#242c35; --batch:#1a2028; --shadow:0 1px 2px rgba(0,0,0,.4); color-scheme: dark;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
@@ -35,11 +19,11 @@ a{color:var(--primary)}
 .upper{text-transform:uppercase}
 .w60{width:60px}.w80{width:80px}.w90{width:90px;min-width:90px}.w100{width:100px}.w120{min-width:120px}.w130{width:130px}.w180{width:180px}.w240{max-width:240px}.w-auto{width:auto}
 
-.topbar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border)}
+.topbar{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:inset 0 3px 0 var(--primary)}
 .topbar-in{max-width:1360px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .brand{display:flex;align-items:center;gap:10px;margin-right:auto;min-width:0}
-.brand-logo{width:34px;height:34px;border-radius:8px;flex:none}
-.brand h1{font-size:16px;margin:0;line-height:1.2}
+.brand-logo{width:40px;height:40px;flex:none;object-fit:contain}
+.brand h1{font-size:16px;margin:0;line-height:1.2;color:var(--primary)}
 .brand .sub{font-size:12px;color:var(--muted)}
 .sync{font-size:12px;color:var(--muted);text-align:right}
 .user-chip{display:flex;align-items:center;gap:8px;font-size:13px}
@@ -204,3 +188,10 @@ fieldset.issues label.disabled{opacity:.5;cursor:not-allowed}
 .order-table{min-width:1140px}
 .order-table .c-code{width:110px;white-space:nowrap}
 .new-code{color:var(--info);font-weight:600}
+
+/* v2.3 — logo & tone trắng / xanh lá đậm */
+.btn.primary:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
+.login-brand{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:14px;text-align:center}
+.login-brand img{width:92px;height:92px}
+.login-brand .co{font-weight:800;font-size:20px;color:var(--primary);letter-spacing:.3px}
+.login-brand .app{font-size:13px;color:var(--muted)}
