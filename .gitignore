@@ -1,0 +1,6 @@
+# Mật khẩu tài khoản thử nghiệm — KHÔNG đưa lên GitHub
+TAI_KHOAN_THU_NGHIEM.md
+.env
+*.local
+.DS_Store
+Thumbs.db
