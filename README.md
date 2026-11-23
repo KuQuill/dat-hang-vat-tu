@@ -70,7 +70,8 @@ Phòng vật tư thêm nhóm / nhóm con trong *Kho & tài sản → 🗂 Nhóm 
 
 ## Trạng thái hiện tại
 
-- 🌐 **Web app**: https://kuquill.github.io/dat-hang-vat-tu/ — tự cập nhật mỗi khi push thay đổi trong `app/` lên nhánh `main`.
+- 🌐 **Web app**: https://vattu.mekongdecor.com/ (GitHub Pages, tên miền riêng; link cũ kuquill.github.io/dat-hang-vat-tu tự chuyển sang) — tự cập nhật mỗi khi push thay đổi trong `app/` lên nhánh `main`.
+- DNS: bản ghi `CNAME vattu → kuquill.github.io` đặt tại **dns.cloud360.vn** (DNS thật của mekongdecor.com, không phải cPanel).
 
 - Đã tạo project Supabase **dat-hang-vat-tu** (Singapore, gói miễn phí), đã chạy toàn bộ SQL, đã triển khai Edge Function `admin-users`.
 - `app/js/config.js` đã trỏ tới project này.
