@@ -6,6 +6,7 @@ import './views-order.js';
 import './views-track.js';
 import './views-kho.js';
 import './views-purchase.js';
+import './views-sites.js';
 import './views-users.js';
 
 /* ---------- Bộ đệm & đồng bộ ---------- */
@@ -33,10 +34,13 @@ async function pull(full = false) {
     S.prs = d.prs; S.items = d.items; S.atts = d.atts; S.deliveries = d.deliveries;
     S.sync = { pr: maxTs(d.prs, 'updated_at', null), item: maxTs(d.items, 'updated_at', null), att: maxTs(d.atts, 'created_at', null) };
   } else {
-    S.prs = mergeById(S.prs, d.prs); S.items = mergeById(S.items, d.items); S.atts = mergeById(S.atts, d.atts);
+    S.prs = mergeById(S.prs, d.prs); S.atts = mergeById(S.atts, d.atts);
+    if (d.changedPrs) { const set = new Set(d.changedPrs); S.items = S.items.filter(i => !set.has(i.pr_id)); }
+    S.items = mergeById(S.items, d.items);
     if (d.changedItems) { const set = new Set(d.changedItems); S.deliveries = S.deliveries.filter(x => !set.has(x.item_id)).concat(d.deliveries); }
     else S.deliveries = d.deliveries;
     S.sync = { pr: maxTs(d.prs, 'updated_at', S.sync.pr), item: maxTs(d.items, 'updated_at', S.sync.item), att: maxTs(d.atts, 'created_at', S.sync.att) };
+    const live = new Set(S.items.map(i => i.id)); S.deliveries = S.deliveries.filter(x => live.has(x.item_id));
   }
   S.ver++;
   S.profile = S.profiles.find(p => p.id === S.user.id) || null;

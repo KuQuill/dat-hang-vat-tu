@@ -48,11 +48,28 @@ Phòng vật tư chuyển đợt sang "Đang giao" ──► Công trường b�
 | Màn hình | Ai dùng | Nội dung |
 |---|---|---|
 | **1. Thông tin** | Mọi người | Công trường, ngày cần, địa điểm giao; thông tin cá nhân; đổi mật khẩu |
-| **2. Đặt hàng** | Mọi người | Tên PR, vật tư (gợi ý từ kho + **số còn trống ở kho tổng**, báo **cần mua mới**), dán từ Excel, ảnh |
+| **2. Đặt hàng** | Mọi người | Hạng mục, **nơi nhận hàng**, diễn giải, vật tư (gợi ý từ kho + **số còn trống ở kho tổng**, báo **cần mua mới**), dán từ Excel, ảnh |
 | **3. Theo dõi & nhận hàng** | Mọi người | Toàn bộ PR. Phòng vật tư duyệt, chia đợt, chọn nguồn kho / mua, NCC, PO, ngày về. Công trường **xác nhận nhận hàng** từng đợt |
 | **4. Kho & tài sản** | Mọi người xem · phòng vật tư sửa | **Vật tư theo số lượng** (vị trí, tình trạng, ảnh, tồn tối thiểu, đang giữ cho PR) · **Tài sản từng chiếc** (mã tài sản, biển số, vị trí, tình trạng, lịch sử, **tem QR**) · **Nhóm vật tư** |
 | **5. Đề xuất mua** | Phòng vật tư · Thu mua | Danh sách cần mua → lập đề xuất. Thu mua cập nhật trạng thái, NCC, đơn giá, ngày về, PO |
 | **6. Tài khoản** | Quản trị | Tạo tài khoản, đổi quyền, gán công trường, khoá, đặt lại mật khẩu |
+
+### Số PR & thu hồi / sửa PR
+- Số PR tự sinh theo dự án: **`<Mã dự án>.<Hạng mục>.PR<số>.R<lần sửa>`**, vd `SSD.MEP.PR01.R1`.
+  Hạng mục chọn ở màn hình Đặt hàng (CG, MM, DC, KC, HT, NT, MEP, K); số thứ tự đếm riêng cho từng dự án + hạng mục.
+- **Đặt nhầm?** Ở màn hình Theo dõi bấm **↩ Thu hồi & sửa** → PR chuyển *Đã thu hồi – đang sửa*, kế hoạch giao và hàng đang giữ ở kho được nhả ra →
+  sửa ở màn hình Đặt hàng → **Gửi lại PR đã sửa** → thành bản **R2, R3…** và chờ duyệt lại.
+- Thu hồi được khi PR đang chờ duyệt, bị từ chối, đã duyệt hoặc đã đặt hàng — nhưng **chưa có đợt nào đang giao / đã nhận** và Thu mua **chưa đang mua** cho PR đó.
+- Người đặt (hoặc phòng vật tư) thu hồi được; người đặt huỷ được PR khi chờ duyệt / đã thu hồi / bị từ chối.
+
+### Dự án / công trường
+Màn hình **Dự án** (phòng vật tư, quản trị): thêm / sửa **mã dự án**, tên dự án, địa chỉ, chỉ huy trưởng, ngừng dự án.
+Mã dự án đã có PR thì không đổi được (vì nằm trong số PR).
+
+### Nhập tài khoản hàng loạt (CSV)
+Màn hình **Tài khoản → 📋 Nhập CSV hàng loạt** (quản trị). Cột: `Họ tên, Email, Mật khẩu, Quyền, Mã dự án`.
+Mật khẩu để trống → tự tạo. Quyền: Công trường / Phòng vật tư / Thu mua / Quản trị (hoặc site / procurement / purchasing / admin).
+Xem trước từng dòng (dòng lỗi bị bỏ qua), tạo xong tải được file danh sách email + mật khẩu để gửi nội bộ.
 
 ### Mã vật tư & nhóm
 Mã dạng `NHÓM-0001`: **CG** Cơ giới · **MM** Máy móc · **DC** Công cụ dụng cụ · **KC** Kết cấu · **HT** Hoàn thiện · **NT** Nội thất · **MEP** · **K** Khác.
@@ -83,7 +100,7 @@ Phòng vật tư thêm nhóm / nhóm con trong *Kho & tài sản → 🗂 Nhóm 
 ## Bước 1 — Tạo Supabase
 
 1. https://supabase.com → **New project** → Region **Southeast Asia (Singapore)**.
-2. **SQL Editor** → dán toàn bộ `supabase/migrations/001_init.sql` → **Run**.
+2. **SQL Editor** → chạy lần lượt `supabase/migrations/001_init.sql` rồi `002_pr_code_recall_sites.sql`.
 3. Thêm công trường:
    ```sql
    insert into public.sites (code, name, address, manager) values

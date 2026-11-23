@@ -58,7 +58,7 @@ export const ROLE = { site: 'Công trường', procurement: 'Phòng vật tư', 
 export const PR_ST = {
   cho_duyet: ['Chờ duyệt', 'b-amber'], da_duyet: ['Đã duyệt', 'b-blue'], tu_choi: ['Từ chối', 'b-red'],
   da_dat: ['Đã đặt hàng', 'b-violet'], dang_giao: ['Đang giao', 'b-teal'], co_van_de: ['Có vấn đề nhận hàng', 'b-red'],
-  da_ve: ['Đã nhận đủ', 'b-green'], huy: ['Đã huỷ', 'b-gray'],
+  da_ve: ['Đã nhận đủ', 'b-green'], huy: ['Đã huỷ', 'b-gray'], thu_hoi: ['Đã thu hồi – đang sửa', 'b-gray'],
 };
 export const IT_ST = {
   cho_xu_ly: ['Chờ xử lý', 'b-gray'], da_dat: ['Đã đặt', 'b-violet'], dang_giao: ['Đang giao', 'b-teal'],

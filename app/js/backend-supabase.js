@@ -43,7 +43,16 @@ export function SupaBackend() {
         all('pr_items', '*', q => (since.item ? q.gte('updated_at', since.item) : q).order('updated_at')),
         all('pr_attachments', '*', q => (since.att ? q.gte('created_at', since.att) : q).order('created_at')),
       ]);
-      let deliveries = [], changedItems = null;
+      let deliveries = [], changedItems = null, changedPrs = null;
+      if (since.pr) {
+        // PR có thay đổi → tải lại toàn bộ dòng hàng của PR đó (để bỏ các dòng đã xoá khi sửa PR)
+        changedPrs = prs.map(p => p.id);
+        const have = new Set(items.map(i => i.id));
+        for (let k = 0; k < changedPrs.length; k += 100) {
+          const chunk = changedPrs.slice(k, k + 100);
+          for (const it of await all('pr_items', '*', q => q.in('pr_id', chunk))) if (!have.has(it.id)) { items.push(it); have.add(it.id); }
+        }
+      }
       if (!since.item) deliveries = await all('pr_deliveries', '*', q => q.order('batch_no'));
       else {
         changedItems = items.map(i => i.id);
@@ -52,7 +61,7 @@ export function SupaBackend() {
           deliveries = deliveries.concat(await all('pr_deliveries', '*', q => q.in('item_id', chunk)));
         }
       }
-      return { sites, groups, subgroups, materials, profiles, stock, assets, proposals, lines, links, prs, items, atts, deliveries, changedItems, full: !since.pr };
+      return { sites, groups, subgroups, materials, profiles, stock, assets, proposals, lines, links, prs, items, atts, deliveries, changedItems, changedPrs, full: !since.pr };
     },
     async assetHistory(id) {
       const { data, error } = await sb.from('asset_history').select('*').eq('asset_id', id).order('created_at', { ascending: false }).limit(200);
@@ -70,8 +79,12 @@ export function SupaBackend() {
       return Object.fromEntries((data || []).filter(x => x.signedUrl).map(x => [x.path, x.signedUrl]));
     },
 
-    createPR: p => rpc('create_pr', { p_site_code: p.site_code, p_need_date: p.need_date, p_items: p.items, p_title: p.title,
+    createPR: p => rpc('create_pr', { p_site_code: p.site_code, p_category: p.category, p_need_date: p.need_date, p_items: p.items, p_title: p.title || null,
                                       p_note: p.note || null, p_delivery_place: p.delivery_place || null, p_attachments: p.attachments || null }),
+    updatePR: (pr, p) => rpc('update_pr', { p_pr: pr, p_need_date: p.need_date, p_items: p.items, p_title: p.title || null,
+                                      p_note: p.note || null, p_delivery_place: p.delivery_place || null, p_attachments: p.attachments || null }),
+    recallPR: (pr, reason) => rpc('recall_pr', { p_pr: pr, p_reason: reason || null }),
+    upsertSite: s => rpc('upsert_site', { p_id: s.id || null, p_code: s.code, p_name: s.name, p_address: s.address || null, p_manager: s.manager || null, p_active: s.active !== false }),
     addAttachments: (pr, files) => rpc('add_attachments', { p_pr: pr, p_files: files }),
     approvePR: (pr, ok, reason) => rpc('approve_pr', { p_pr: pr, p_ok: ok, p_reason: reason || null }),
     cancelPR: (pr, reason) => rpc('cancel_pr', { p_pr: pr, p_reason: reason || null }),

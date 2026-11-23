@@ -7,8 +7,9 @@ import { S, ctx, ACT, VIEWS, INPUTS, KEY, LS, IDB, DEMO, CONFIG, hooks, $, $$, e
 const newRow = () => ({ key: uid(), name: '', spec: '', unit: '', qty: '', note: '', group: '', material_id: null, code: null, force_new: false });
 function loadDraft() {
   const d = LS.get(KEY.draft, null);
-  S.draft = d && Array.isArray(d.rows) ? d : { title: '', site_code: '', need_date: '', delivery_place: '', note: '', rows: [] };
-  if (S.draft.title == null) S.draft.title = '';
+  S.draft = d && Array.isArray(d.rows) ? d : { title: '', site_code: '', category: '', need_date: '', delivery_place: '', note: '', rows: [], editing: null };
+  for (const k of ['title', 'category', 'delivery_place']) if (S.draft[k] == null) S.draft[k] = '';
+  if (S.draft.editing === undefined) S.draft.editing = null;
   if (!S.draft.rows.length) S.draft.rows = [newRow(), newRow(), newRow()];
 }
 const saveDraft = debounce(() => LS.set(KEY.draft, S.draft), 300);
@@ -32,12 +33,11 @@ VIEWS.info = {
     const s = siteByCode(d.site_code);
     return `<div class="grid cols-2">
       <section class="card">
-        <h2>🏗 Công trường & giao hàng</h2>
+        <h2>🏗 Dự án / công trường</h2>
         <div class="form">
-          <label class="f full"><span class="req">Công trường</span><select data-h="site_code">${siteOptions(d.site_code)}</select></label>
+          <label class="f full"><span class="req">Dự án / công trường</span><select data-h="site_code" ${d.editing ? 'disabled' : ''}>${siteOptions(d.site_code, '— Chọn dự án —')}</select></label>
           ${s ? `<dl class="kv full"><dt>Địa chỉ</dt><dd>${esc(s.address || '—')}</dd><dt>Chỉ huy trưởng</dt><dd>${esc(s.manager || '—')}</dd></dl>` : ''}
           <label class="f"><span class="req">Ngày cần hàng</span><input type="date" data-h="need_date" min="${todayISO()}" value="${esc(d.need_date)}"></label>
-          <label class="f">Địa điểm giao<input data-h="delivery_place" value="${esc(d.delivery_place)}" placeholder="vd: Cổng số 2, kho tạm"></label>
           <label class="f full">Ghi chú cho phòng vật tư<textarea data-h="note" rows="2">${esc(d.note)}</textarea></label>
         </div>
         <div class="toolbar mt"><span class="muted small">Tự động lưu nháp trên máy</span><span class="spacer"></span>
@@ -47,10 +47,9 @@ VIEWS.info = {
         <h2>👤 Người đặt hàng</h2>
         <div class="form">
           <label class="f">Họ tên<input id="pf-name" value="${esc(p.full_name)}"></label>
-          <label class="f">Số điện thoại<input id="pf-phone" value="${esc(p.phone)}" inputmode="tel"></label>
           <label class="f">Email đăng nhập<input value="${esc(p.email || S.user.email)}" readonly></label>
           <label class="f">Quyền<input value="${esc(ROLE[p.role] || '')}" readonly></label>
-          <label class="f full">Công trường của tôi<select id="pf-site">${siteOptions(p.site_id ? (siteById(p.site_id) || {}).code : '')}</select></label>
+          <label class="f full">Dự án / công trường của tôi<select id="pf-site">${siteOptions(p.site_id ? (siteById(p.site_id) || {}).code : '')}</select></label>
         </div>
         <p class="small muted">Người cùng công trường được xác nhận nhận hàng thay cho nhau.</p>
         <div class="toolbar"><span class="spacer"></span><button class="btn" data-act="save-profile">Lưu thông tin cá nhân</button></div>
@@ -82,7 +81,7 @@ VIEWS.info = {
 Object.assign(ACT, {
   'save-profile': async () => {
     try {
-      await ctx.B.updateProfile({ full_name: $('#pf-name').value, phone: $('#pf-phone').value, site_code: $('#pf-site').value });
+      await ctx.B.updateProfile({ full_name: $('#pf-name').value, phone: (S.profile || {}).phone || '', site_code: $('#pf-site').value });
       await hooks.pull(); toast('Đã lưu thông tin cá nhân', 'ok'); hooks.render();
     } catch (e) { toast(isNet(e) ? 'Không có kết nối mạng' : e.message, 'err'); }
   },
@@ -149,10 +148,18 @@ VIEWS.order = {
   title: 'Đặt hàng',
   html() {
     const d = S.draft; const s = siteByCode(d.site_code);
+    const ed = d.editing;
     return `<section class="card mb">
-        <div class="form"><label class="f full"><span class="req">Tên PR</span><input data-h="title" value="${esc(d.title)}" maxlength="200" placeholder="vd: Thép + xi măng đổ móng nhà xưởng A"></label></div>
+        ${ed ? `<div class="edit-banner">✏ Đang sửa <b class="mono">${esc(ed.pr_no)}</b> — gửi lại sẽ thành <b class="mono">${esc(ed.base_no)}.R${ed.revision + 1}</b> và chờ duyệt lại.
+          <button class="btn sm" data-act="cancel-edit">Huỷ sửa</button></div>` : ''}
+        <div class="form">
+          <label class="f"><span class="req">Hạng mục</span><select data-h="category" ${ed ? 'disabled' : ''}>${catOptions(d.category)}</select></label>
+          <label class="f"><span class="req">Nơi nhận hàng</span><input data-h="delivery_place" value="${esc(d.delivery_place)}" placeholder="vd: Kho tạm cổng số 2 — anh Hùng 0901…"></label>
+          <label class="f full">Diễn giải (không bắt buộc)<input data-h="title" value="${esc(d.title)}" maxlength="200" placeholder="vd: Ống cấp nước tầng 3"></label>
+        </div>
+        <div class="prcode mt">Số PR: <b class="mono" id="pr-code">${esc(prCodePreview())}</b></div>
         <div class="toolbar mt">
-          <div class="small">Công trường: <b>${s ? esc(s.code + ' — ' + s.name) : '<span class="late-text">chưa chọn</span>'}</b>
+          <div class="small">Dự án: <b>${s ? esc(s.code + ' — ' + s.name) : '<span class="late-text">chưa chọn</span>'}</b>
             &nbsp;·&nbsp; Cần ngày: <b>${d.need_date ? esc(fmtD(d.need_date)) : '<span class="late-text">chưa chọn</span>'}</b>
             &nbsp;<button class="linkbtn" data-act="tab" data-tab="info">Sửa</button></div>
           <span class="spacer"></span><span class="small muted">✓ có trong kho · ≈ gần giống · 🆕 mã mới · 🛒 cần mua mới</span>
@@ -174,7 +181,7 @@ VIEWS.order = {
       </section>
       <div class="toolbar mt">
         <span class="small muted">Nháp (kể cả ảnh) tự lưu trên máy. Phần kho tổng không đủ sẽ được phòng vật tư lập đề xuất mua.</span><span class="spacer"></span>
-        <button class="btn primary" data-act="submit" id="btn-submit">Gửi đơn hàng (PR)</button>
+        <button class="btn primary" data-act="submit" id="btn-submit">${d.editing ? 'Gửi lại PR đã sửa' : 'Gửi đơn hàng (PR)'}</button>
       </div>`;
   },
 };
@@ -246,7 +253,12 @@ INPUTS.push(e => {
     if (f === 'qty') refreshAvail(r.key);
     return true;
   }
-  if (t.dataset.h) { S.draft[t.dataset.h] = t.value; saveDraft(); if (t.dataset.h === 'site_code' && e.type === 'change') hooks.render(); return true; }
+  if (t.dataset.h) {
+    S.draft[t.dataset.h] = t.value; saveDraft();
+    if (t.dataset.h === 'site_code' && e.type === 'change') hooks.render();
+    if (t.dataset.h === 'category') { const el = $('#pr-code'); if (el) el.textContent = prCodePreview(); }
+    return true;
+  }
   return false;
 });
 
@@ -283,8 +295,9 @@ async function pasteFromExcel() {
 
 async function submitOrder() {
   const d = S.draft; const errs = [];
-  if (!d.title.trim()) errs.push('Chưa nhập tên PR');
-  if (!siteByCode(d.site_code)) errs.push('Chưa chọn công trường (Sheet 1)');
+  if (!siteByCode(d.site_code)) errs.push('Chưa chọn dự án / công trường (Sheet 1)');
+  if (!d.category) errs.push('Chưa chọn hạng mục');
+  if (!d.delivery_place.trim()) errs.push('Chưa nhập nơi nhận hàng');
   if (!d.need_date) errs.push('Chưa chọn ngày cần hàng (Sheet 1)');
   else if (d.need_date < todayISO()) errs.push('Ngày cần hàng đã qua (Sheet 1)');
   const rows = d.rows.filter(r => r.name.trim() || String(r.qty).trim());
@@ -325,23 +338,24 @@ async function submitOrder() {
   if (noUnit.length) return showErrs(noUnit);
 
   const payload = {
-    title: d.title.trim(), site_code: d.site_code, need_date: d.need_date, note: d.note, delivery_place: d.delivery_place,
+    title: d.title.trim(), site_code: d.site_code, category: d.category, need_date: d.need_date, note: d.note, delivery_place: d.delivery_place.trim(),
     items: rows.map(r => r.material_id
       ? { material_id: r.material_id, qty: parseNum(r.qty), unit: r.unit.trim() || null, note: r.note.trim() || null }
       : { name: r.name.trim(), spec: r.spec.trim() || null, unit: r.unit.trim(), group: r.group || null, qty: parseNum(r.qty), note: r.note.trim() || null, force_new: !!r.force_new }),
   };
+  const wasEdit = !!d.editing;
   const lineOf = im => (im.row ? (rows.findIndex(r => r.key === im.row) + 1) || null : null);
   const imgs = S.draftImages.filter(im => !im.row || rows.some(r => r.key === im.row));
   const btn = $('#btn-submit'); if (btn) { btn.disabled = true; btn.textContent = imgs.length ? 'Đang tải ảnh và gửi…' : 'Đang gửi…'; }
   try {
     payload.attachments = await uploadImages(imgs, im => ({ line: lineOf(im) }));
-    const res = await ctx.B.createPR(payload);
+    const res = d.editing ? await ctx.B.updatePR(d.editing.pr_no, payload) : await ctx.B.createPR(payload);
     await clearDraftAfterSend();
     await hooks.pull().catch(() => {});
     hooks.render();
     const { action } = await modal({
-      title: `✅ Đã tạo ${res.pr_no} — Chờ duyệt`,
-      body: `<p><b>${esc(res.title)}</b><br>Công trường <b>${esc(res.site)}</b> · cần ngày <b>${esc(fmtD(res.need_date))}</b>${res.images ? ` · ${res.images} ảnh` : ''}</p>
+      title: `✅ Đã ${wasEdit ? 'gửi lại' : 'tạo'} ${res.pr_no} — Chờ duyệt`,
+      body: `<p>${res.title && res.title !== res.pr_no ? `<b>${esc(res.title)}</b><br>` : ''}Dự án <b>${esc(res.site)}</b> · cần ngày <b>${esc(fmtD(res.need_date))}</b>${res.images ? ` · ${res.images} ảnh` : ''}</p>
         <div class="table-wrap"><table><thead><tr><th>#</th><th>Mã</th><th>Vật tư</th><th class="right">SL</th><th>ĐVT</th><th>Kho tổng</th></tr></thead><tbody>
         ${res.items.map(it => { const free = khoFree(it.id); return `<tr><td>${it.line}</td><td class="mono nowrap">${it.created ? '🆕 ' : ''}${esc(it.code)}</td>
           <td>${esc(it.name)}${it.input_name && norm(it.input_name) !== norm(it.name) && !it.created ? `<div class="small muted">bạn gõ: “${esc(it.input_name)}”</div>` : ''}</td>
@@ -352,7 +366,7 @@ async function submitOrder() {
     });
     if (action === 'track') { S.tab = 'track'; S.filters = { ...S.filters, q: res.pr_no, status: '', kpi: '' }; LS.set(KEY.tab, S.tab); hooks.render(); }
   } catch (e) {
-    if (isNet(e)) {
+    if (isNet(e) && !d.editing) {
       const id = uid();
       await IDB.set(KEY.obImgs(id), imgs.map(im => ({ blob: im.blob, name: im.name, line: lineOf(im) })));
       delete payload.attachments;
@@ -366,11 +380,45 @@ async function submitOrder() {
   }
 }
 async function clearDraftAfterSend() {
-  S.draft.rows = [newRow(), newRow(), newRow()]; S.draft.note = ''; S.draft.title = ''; LS.set(KEY.draft, S.draft);
+  S.draft.rows = [newRow(), newRow(), newRow()]; S.draft.note = ''; S.draft.title = ''; S.draft.editing = null; LS.set(KEY.draft, S.draft);
   S.draftImages.forEach(im => im._url && URL.revokeObjectURL(im._url)); S.draftImages = []; await IDB.del(KEY.draftImgs);
 }
 
+function catOptions(sel) {
+  return '<option value="">— Chọn hạng mục —</option>' + S.groups.filter(g => g.active !== false)
+    .map(g => `<option value="${esc(g.code)}" ${g.code === sel ? 'selected' : ''}>${esc(g.code)} — ${esc(g.name)}</option>`).join('');
+}
+function prCodePreview() {
+  const d = S.draft;
+  if (d.editing) return `${d.editing.base_no}.R${d.editing.revision + 1} (sau khi gửi lại)`;
+  const s = siteByCode(d.site_code);
+  if (!s || !d.category) return 'chọn dự án và hạng mục để tạo số PR';
+  const prefix = `${s.code}.${d.category}.PR`.toUpperCase();
+  let n = 0;
+  for (const p of S.prs) { const b = (p.base_no || '').toUpperCase(); if (b.startsWith(prefix)) n = Math.max(n, parseInt(b.slice(prefix.length), 10) || 0); }
+  return `${s.code}.${d.category}.PR${String(n + 1).padStart(2, '0')}.R1 (dự kiến)`;
+}
+// Nạp PR (đã thu hồi) vào form để sửa
+function loadPRForEdit(prId) {
+  const pr = S.prs.find(x => x.id === prId); if (!pr) return toast('Không tìm thấy PR', 'err');
+  const site = siteById(pr.site_id) || {};
+  const its = S.items.filter(i => i.pr_id === pr.id).sort((a, b) => a.line_no - b.line_no);
+  S.draft = { title: pr.title && pr.title !== pr.pr_no ? pr.title : '', site_code: site.code || '', category: pr.category || '', need_date: pr.need_date < todayISO() ? '' : pr.need_date,
+    delivery_place: pr.delivery_place || '', note: pr.note || '',
+    editing: { id: pr.id, pr_no: pr.pr_no, base_no: pr.base_no || pr.pr_no.replace(/\.R\d+$/, ''), revision: pr.revision || 1 },
+    rows: its.map(i => { const m = D().mat.get(i.material_id) || {}; return Object.assign(newRow(), { material_id: i.material_id, code: m.code, name: m.name || '', spec: m.spec || '', unit: i.unit, qty: String(i.qty), note: i.note || '' }); }) };
+  if (!S.draft.rows.length) S.draft.rows = [newRow()];
+  S.draftImages = []; saveDraftImages(); LS.set(KEY.draft, S.draft);
+  S.tab = 'order'; LS.set(KEY.tab, S.tab); hooks.render(); window.scrollTo(0, 0);
+  toast(`Đang sửa ${pr.pr_no} — sửa xong bấm "Gửi lại PR đã sửa"`, '');
+}
+
 Object.assign(ACT, {
+  'load-pr-edit': b => loadPRForEdit(b.dataset.id),
+  'cancel-edit': async () => {
+    if (!(await confirmBox('Huỷ sửa?', '<p>Nội dung đang sửa sẽ bị bỏ. PR vẫn ở trạng thái <b>đã thu hồi</b> — có thể tiếp tục sửa hoặc huỷ phiếu ở màn hình Theo dõi.</p>', 'Huỷ sửa', true))) return;
+    S.draft.editing = null; S.draft.rows = [newRow(), newRow(), newRow()]; S.draft.title = ''; LS.set(KEY.draft, S.draft); hooks.render();
+  },
   'add-row': () => { const r = newRow(); S.draft.rows.push(r); saveDraft(); const tmp = document.createElement('tbody'); tmp.innerHTML = rowHTML(r, S.draft.rows.length - 1); $('#rows').appendChild(tmp.firstElementChild); $(`tr[data-row="${r.key}"] [data-f="name"]`).focus(); },
   'del-row': b => {
     const k = b.dataset.key; S.draft.rows = S.draft.rows.filter(r => r.key !== k); if (!S.draft.rows.length) S.draft.rows.push(newRow());
@@ -391,7 +439,7 @@ Object.assign(ACT, {
   'ob-edit': async b => {
     const o = S.outbox.find(x => x.id === b.dataset.id); if (!o) return;
     const p = o.payload;
-    S.draft = { title: p.title || '', site_code: p.site_code, need_date: p.need_date, delivery_place: p.delivery_place || '', note: p.note || '',
+    S.draft = { title: p.title || '', site_code: p.site_code, category: p.category || '', editing: null, need_date: p.need_date, delivery_place: p.delivery_place || '', note: p.note || '',
       rows: p.items.map(it => { const r = newRow(); const m = it.material_id && D().mat.get(it.material_id);
         return Object.assign(r, m ? { material_id: m.id, code: m.code, name: m.name, spec: m.spec || '', unit: it.unit || m.unit } : { name: it.name || '', spec: it.spec || '', unit: it.unit || '', group: it.group || '', force_new: !!it.force_new },
           { qty: String(it.qty ?? ''), note: it.note || '' }); }) };

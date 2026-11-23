@@ -36,7 +36,6 @@ function stockShell() {
       <select data-sfilter="cond">${condOptions(f.cond, 'Mọi tình trạng')}</select>
       <div class="checks">
         <label><input type="checkbox" data-sfilter="has" ${f.has ? 'checked' : ''}> Chỉ dòng có tồn</label>
-        <label><input type="checkbox" data-sfilter="low" ${f.low ? 'checked' : ''}> Dưới mức tối thiểu</label>
         <span class="spacer"></span>
         ${staff ? `<button class="btn sm" data-act="stock-new">＋ Vật tư mới</button><button class="btn sm" data-act="stock-import">📋 Nhập từ Excel</button><button class="btn sm" data-act="stock-template">⬇ File mẫu</button>` : ''}
         <button class="btn sm" data-act="stock-export">⬇ Xuất Excel</button>
@@ -74,27 +73,24 @@ function renderStock() {
     <div class="kpi"><div class="v">${kho.filter(s => Number(s.qty) > 0).length}</div><div class="l">Dòng có tồn ở kho tổng</div></div>
     <div class="kpi"><div class="v">${S.stock.filter(s => s.site_id && Number(s.qty) > 0).length}</div><div class="l">Dòng đang ở công trường</div></div>
     <div class="kpi"><div class="v">${held}</div><div class="l">Dòng đang giữ hàng cho PR</div></div>
-    <button class="kpi ${S.sfilters.low ? 'active' : ''}" data-act="stock-low"><div class="v ${low ? 'late-text' : ''}">${low}</div><div class="l">Dưới mức tồn tối thiểu</div></button>
     <div class="kpi"><div class="v v-sm">${last ? esc(fmtDT(last.updated_at)) : '—'}</div><div class="l">Cập nhật gần nhất${last ? ' · ' + esc(profName(last.updated_by)) : ''}</div></div></div>`;
   const list = stockRows(); const MAX = 500;
   if (!list.length) { $('#stock-table').innerHTML = '<div class="card empty">Không có dòng tồn kho nào khớp bộ lọc.</div>'; return; }
   $('#stock-table').innerHTML = `<div class="small muted mb-s">${list.length} dòng${list.length > MAX ? ` (hiển thị ${MAX})` : ''} · "Đang giữ" = đã dành cho PR đã duyệt, chưa xuất</div>
     <div class="table-wrap"><table class="stock-table">
-      <thead><tr><th>Ảnh</th><th>Vật tư</th><th>ĐVT</th><th>Vị trí</th><th>Tình trạng</th><th class="right">Tồn</th><th class="right">Đang giữ</th><th class="right">Còn trống</th><th class="right">Tối thiểu</th><th>Cập nhật</th>${staff ? '<th></th>' : ''}</tr></thead>
+      <thead><tr><th>Ảnh</th><th>Vật tư</th><th>ĐVT</th><th>Vị trí</th><th>Tình trạng</th><th class="right">Tồn</th><th class="right">Đang giữ</th><th class="right">Còn trống</th><th>Cập nhật</th>${staff ? '<th></th>' : ''}</tr></thead>
       <tbody>${list.slice(0, MAX).map(({ s, m }) => {
-        if (!s) return `<tr class="muted-row"><td><div class="sthumb noimg">—</div></td><td>${matCell(m)}</td><td>${esc(m.unit)}</td><td><b>Kho tổng</b></td><td></td><td class="right muted">0</td><td></td><td></td><td></td><td class="small muted">chưa khai báo</td>
+        if (!s) return `<tr class="muted-row"><td><div class="sthumb noimg">—</div></td><td>${matCell(m)}</td><td>${esc(m.unit)}</td><td><b>Kho tổng</b></td><td></td><td class="right muted">0</td><td></td><td></td><td class="small muted">chưa khai báo</td>
           ${staff ? `<td><button class="btn sm" data-act="stock-declare" data-mid="${m.id}">Khai báo tồn</button></td>` : ''}</tr>`;
         const reserved = round6(dd.openKhoByStock.get(s.id) || 0); const free = round6(Number(s.qty) - reserved);
-        const lowRow = !s.site_id && s.min_qty != null && Number(s.qty) < Number(s.min_qty);
         return `<tr>
           <td>${imgTag(s.image_path || m.image_path, m.name, 'sthumb')}</td>
           <td>${matCell(m)}${s.note ? `<div class="small">📝 ${esc(s.note)}</div>` : ''}</td><td>${esc(m.unit)}</td>
           <td>${locCell(s.site_id, s.location_detail)}</td><td>${badge(COND, s.condition)}</td>
-          <td class="right ${lowRow ? 'stock-low' : ''}"><b>${fmtN(s.qty)}</b></td>
+          <td class="right"><b>${fmtN(s.qty)}</b></td>
           <td class="right">${reserved ? fmtN(reserved) : ''}</td><td class="right">${s.site_id || !USABLE.includes(s.condition) ? '' : fmtN(free)}</td>
-          <td class="right muted">${s.min_qty != null ? fmtN(s.min_qty) : ''}${lowRow ? ' <span class="stock-low">⚠</span>' : ''}</td>
           <td class="small muted nowrap">${esc(fmtDT(s.updated_at))}</td>
-          ${staff ? `<td class="nowrap"><button class="btn sm" data-act="stock-edit" data-id="${s.id}" title="Sửa số tồn, tối thiểu, vị trí">✏</button>
+          ${staff ? `<td class="nowrap"><button class="btn sm" data-act="stock-edit" data-id="${s.id}" title="Sửa số tồn, vị trí">✏</button>
             <button class="btn sm" data-act="stock-img" data-id="${s.id}" title="Ảnh vật tư">📷</button>
             <button class="btn sm" data-act="stock-move" data-id="${s.id}" title="Điều chuyển / đổi tình trạng">⇄</button></td>` : ''}</tr>`;
       }).join('')}</tbody></table></div>`;
@@ -108,17 +104,15 @@ async function stockEdit(id) {
     title: `Sửa tồn — ${m.code} ${m.name}`,
     body: `<p class="small muted">${esc(locLabel(s.site_id))} · ${esc(COND[s.condition][0])}${reserved ? ` · đang giữ ${fmtN(reserved)} ${esc(m.unit)} cho PR` : ''}</p>
       <div class="form"><label class="f"><span class="req">Số lượng tồn (${esc(m.unit)})</span><input id="se-qty" inputmode="decimal" value="${numInput(s.qty)}"></label>
-      <label class="f">Tồn tối thiểu<input id="se-min" inputmode="decimal" value="${numInput(s.min_qty)}"></label>
       <label class="f">Vị trí chi tiết<input id="se-loc" value="${esc(s.location_detail || '')}" placeholder="vd: Bãi A, kệ 3"></label>
       <label class="f">Ghi chú<input id="se-note" value="${esc(s.note || '')}"></label></div>`,
     actions: [{ label: 'Huỷ', value: null }, { label: 'Lưu', value: 'ok', primary: true, validate: v => {
       const q = parseNum(v.qty); if (q == null || Number.isNaN(q) || q < 0) return 'Số lượng tồn không hợp lệ';
-      if (q < reserved) return `Đang giữ ${fmtN(reserved)} cho PR, không thể thấp hơn`;
-      if (v.min.trim() && Number.isNaN(parseNum(v.min))) return 'Tồn tối thiểu không hợp lệ'; return null; } }],
-    read: ov => ({ qty: $('#se-qty', ov).value, min: $('#se-min', ov).value, loc: $('#se-loc', ov).value, note: $('#se-note', ov).value }),
+      if (q < reserved) return `Đang giữ ${fmtN(reserved)} cho PR, không thể thấp hơn`; return null; } }],
+    read: ov => ({ qty: $('#se-qty', ov).value, loc: $('#se-loc', ov).value, note: $('#se-note', ov).value }),
   });
   if (action !== 'ok') return;
-  const f = { min_qty: data.min.trim() === '' ? '' : parseNum(data.min), location_detail: data.loc, note: data.note };
+  const f = { location_detail: data.loc, note: data.note };
   if (parseNum(data.qty) !== Number(s.qty)) f.qty = parseNum(data.qty);
   runAction(() => ctx.B.updateStock(id, f), 'Đã cập nhật tồn kho');
 }
@@ -151,7 +145,7 @@ async function stockNew() {
       <label class="f">Số lượng tồn<input id="sn-qty" inputmode="decimal" value="0"></label>
       <label class="f">Vị trí<select id="sn-site">${locOptions('kho')}</select></label>
       <label class="f">Tình trạng<select id="sn-cond">${condOptions('moi')}</select></label>
-      <label class="f">Vị trí chi tiết<input id="sn-loc"></label><label class="f">Tồn tối thiểu<input id="sn-min" inputmode="decimal"></label>
+      <label class="f">Vị trí chi tiết<input id="sn-loc"></label>
       <div class="f full"><button class="btn sm" id="sn-img" type="button">📷 Chọn ảnh vật tư</button> <span class="small muted" id="sn-img-n"></span></div></div>`,
     onOpen: ov => {
       const g = $('#sn-group', ov); g.addEventListener('change', () => { $('#sn-sub', ov).innerHTML = subgroupOptions(g.value, '', '—'); });
@@ -160,7 +154,7 @@ async function stockNew() {
     actions: [{ label: 'Huỷ', value: null }, { label: 'Thêm', value: 'ok', primary: true,
       validate: v => !v.name.trim() ? 'Nhập tên vật tư' : !v.unit.trim() ? 'Nhập đơn vị tính' : Number.isNaN(parseNum(v.qty)) ? 'Số lượng không hợp lệ' : null }],
     read: ov => ({ name: $('#sn-name', ov).value, spec: $('#sn-spec', ov).value, unit: $('#sn-unit', ov).value, group: $('#sn-group', ov).value, subgroup: $('#sn-sub', ov).value,
-                   qty: $('#sn-qty', ov).value, site: $('#sn-site', ov).value, condition: $('#sn-cond', ov).value, location: $('#sn-loc', ov).value, min_qty: $('#sn-min', ov).value, img: ov._img }),
+                   qty: $('#sn-qty', ov).value, site: $('#sn-site', ov).value, condition: $('#sn-cond', ov).value, location: $('#sn-loc', ov).value, img: ov._img }),
   });
   if (action !== 'ok') return;
   const similar = matchMaterials(data.name + ' ' + data.spec, 3, MATCH);
@@ -178,23 +172,23 @@ async function stockDeclare(mid) {
     title: `Khai báo tồn — ${m.code} ${m.name}`,
     body: `<div class="form"><label class="f"><span class="req">Số lượng (${esc(m.unit)})</span><input id="sd-qty" inputmode="decimal"></label>
       <label class="f">Vị trí<select id="sd-site">${locOptions('kho')}</select></label><label class="f">Tình trạng<select id="sd-cond">${condOptions('moi')}</select></label>
-      <label class="f">Vị trí chi tiết<input id="sd-loc"></label><label class="f">Tồn tối thiểu<input id="sd-min" inputmode="decimal"></label></div>`,
+      <label class="f">Vị trí chi tiết<input id="sd-loc"></label></div>`,
     actions: [{ label: 'Huỷ', value: null }, { label: 'Lưu', value: 'ok', primary: true, validate: v => { const q = parseNum(v.qty); return q == null || Number.isNaN(q) || q < 0 ? 'Số lượng không hợp lệ' : null; } }],
-    read: ov => ({ qty: $('#sd-qty', ov).value, site: $('#sd-site', ov).value, cond: $('#sd-cond', ov).value, loc: $('#sd-loc', ov).value, min: $('#sd-min', ov).value }),
+    read: ov => ({ qty: $('#sd-qty', ov).value, site: $('#sd-site', ov).value, cond: $('#sd-cond', ov).value, loc: $('#sd-loc', ov).value }),
   });
   if (action === 'ok') runAction(async () => {
-    const r = await ctx.B.setStock([{ material_id: mid, qty: parseNum(data.qty), site: data.site === 'kho' ? '' : data.site, condition: data.cond, location: data.loc, min_qty: data.min }], 'set', 'Khai báo tồn');
+    const r = await ctx.B.setStock([{ material_id: mid, qty: parseNum(data.qty), site: data.site === 'kho' ? '' : data.site, condition: data.cond, location: data.loc }], 'set', 'Khai báo tồn');
     if (r.errors.length) throw new Error(r.errors[0].error);
   }, 'Đã khai báo tồn');
 }
-const STOCK_COLS = 'Mã VT · Tên vật tư · Quy cách · ĐVT · Nhóm · Số lượng · Vị trí (Kho tổng / mã CT) · Vị trí chi tiết · Tình trạng · Tồn tối thiểu';
+const STOCK_COLS = 'Mã VT · Tên vật tư · Quy cách · ĐVT · Nhóm · Số lượng · Vị trí (Kho tổng / mã dự án) · Vị trí chi tiết · Tình trạng';
 async function stockImport() {
   const { action, data } = await modal({
     title: 'Nhập tồn kho từ Excel', wide: true,
     body: `<div class="form mb"><label class="f">Kiểu nhập<select id="si-mode"><option value="set">Kiểm kê: đặt số tồn = số lượng nhập</option><option value="add">Nhập/xuất: cộng thêm (số âm = trừ)</option></select></label>
         <label class="f">Lý do / ghi chú<input id="si-reason" placeholder="vd: Kiểm kê cuối tháng 11"></label></div>
       <p class="muted small">Copy từ Excel các cột: <b>${STOCK_COLS}</b>. Có mã → cập nhật mã đó. Không có mã → tìm vật tư trùng tên, không có thì <b>tự cấp mã mới</b> (cần tên + ĐVT). Vị trí để trống = Kho tổng. Tình trạng: Mới / Đã qua sử dụng / Hỏng / Đang sửa.</p>
-      <textarea id="si-box" rows="12" placeholder="KC-0002\tThép thanh vằn D16\tCB400-V\ttấn\tKC\t12\tKho tổng\tBãi thép A\tMới\t5"></textarea>`,
+      <textarea id="si-box" rows="12" placeholder="KC-0002\tThép thanh vằn D16\tCB400-V\ttấn\tKC\t12\tKho tổng\tBãi thép A\tMới"></textarea>`,
     actions: [{ label: 'Huỷ', value: null }, { label: 'Nhập tồn kho', value: 'ok', primary: true, validate: v => parseStock(v.text).length ? null : 'Chưa có dòng dữ liệu nào' }],
     read: ov => ({ mode: $('#si-mode', ov).value, reason: $('#si-reason', ov).value, text: $('#si-box', ov).value }),
   });
@@ -209,7 +203,7 @@ async function stockImport() {
 function parseStock(text) {
   const lines = parsePaste(text);
   if (lines.length && /^ma/.test(norm(lines[0][0])) && Number.isNaN(parseNum(lines[0][5]))) lines.shift();
-  return lines.map(c => ({ code: c[0] || '', name: c[1] || '', spec: c[2] || '', unit: c[3] || '', group: c[4] || '', qty: c[5] ?? '', site: c[6] || '', location: c[7] || '', condition: c[8] || '', min_qty: c[9] ?? '' }));
+  return lines.map(c => ({ code: c[0] || '', name: c[1] || '', spec: c[2] || '', unit: c[3] || '', group: c[4] || '', qty: c[5] ?? '', site: c[6] || '', location: c[7] || '', condition: c[8] || '' }));
 }
 function importResult(ok, total, created, errors) {
   return modal({ title: 'Kết quả nhập', body: `<p>Đã ghi <b>${ok}</b>/${total} dòng.</p>
@@ -472,10 +466,10 @@ Object.assign(ACT, {
   'stock-img': async b => { const img = await pickOneImage(); if (img) runAction(async () => ctx.B.updateStock(b.dataset.id, { image_path: await ctx.B.uploadImage(img) }), 'Đã cập nhật ảnh'); },
   'stock-new': () => stockNew(),
   'stock-import': () => stockImport(),
-  'stock-template': () => downloadText('﻿' + [STOCK_COLS.split(' · ').join(','), 'KC-0002,Thép thanh vằn D16,CB400-V,tấn,KC,12,Kho tổng,Bãi thép A,Mới,5', ',Giàn giáo khung 1.7m,,bộ,DC,80,LA01,,Đã qua sử dụng,'].join('\r\n'), 'mau-nhap-ton-kho.csv', 'text/csv;charset=utf-8'),
+  'stock-template': () => downloadText('﻿' + [STOCK_COLS.split(' · ').join(','), 'KC-0002,Thép thanh vằn D16,CB400-V,tấn,KC,12,Kho tổng,Bãi thép A,Mới', ',Giàn giáo khung 1.7m,,bộ,DC,80,LA01,,Đã qua sử dụng'].join('\r\n'), 'mau-nhap-ton-kho.csv', 'text/csv;charset=utf-8'),
   'stock-export': () => exportRows(stockRows().filter(x => x.s).map(({ s, m }) => ({ 'Mã VT': m.code, 'Tên vật tư': m.name, 'Quy cách': m.spec || '', 'ĐVT': m.unit, 'Nhóm': groupName(m.group_code),
     'Vị trí': locLabel(s.site_id), 'Vị trí chi tiết': s.location_detail || '', 'Tình trạng': COND[s.condition][0], 'Số lượng tồn': Number(s.qty),
-    'Đang giữ cho PR': round6(D().openKhoByStock.get(s.id) || 0), 'Tồn tối thiểu': s.min_qty ?? '', 'Cập nhật': fmtDT(s.updated_at) })), `ton-kho-${todayISO()}`, 'Tồn kho'),
+    'Đang giữ cho PR': round6(D().openKhoByStock.get(s.id) || 0), 'Cập nhật': fmtDT(s.updated_at) })), `ton-kho-${todayISO()}`, 'Tồn kho'),
   'asset-loc': b => { S.afilters.loc = S.afilters.loc === b.dataset.v ? '' : b.dataset.v; hooks.render(); },
   'asset-cond': b => { S.afilters.cond = S.afilters.cond === b.dataset.v ? '' : b.dataset.v; hooks.render(); },
   'asset-open': b => assetOpen(b.dataset.id),

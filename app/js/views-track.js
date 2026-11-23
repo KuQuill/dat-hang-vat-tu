@@ -127,7 +127,7 @@ function prRowHTML(p) {
   const flags = [p.toReceive && canConfirm(p) ? `<span class="badge b-teal">${p.toReceive} đợt chờ nhận</span>` : '', p.buy && isStaff() ? `<span class="badge b-amber">🛒 ${p.buy} dòng cần mua</span>` : ''].join(' ');
   return `<tr class="pr-row ${open ? 'open' : ''} ${p.late ? 'late' : ''}" data-act="toggle" data-id="${p.id}">
       <td><span class="caret">▶</span></td>
-      <td><div class="mono nowrap"><b>${esc(p.pr_no)}</b>${p.atts.length ? ` <span class="muted small" title="Có ảnh">📷${p.atts.length}</span>` : ''}</div><div class="pr-title" title="${esc(p.title)}">${esc(p.title || '')}</div>${flags ? `<div>${flags}</div>` : ''}</td>
+      <td><div class="mono nowrap"><b>${esc(p.pr_no)}</b>${p.atts.length ? ` <span class="muted small" title="Có ảnh">📷${p.atts.length}</span>` : ''}</div>${p.title && p.title !== p.pr_no ? `<div class="pr-title" title="${esc(p.title)}">${esc(p.title)}</div>` : ''}${flags ? `<div>${flags}</div>` : ''}</td>
       <td class="nowrap">${esc(fmtD(p.created_date))}</td>
       <td class="nowrap" title="${esc(p.site_name)}">${esc(p.site_code)}</td>
       <td>${esc(p.requester)}</td>
@@ -199,7 +199,10 @@ function receiptHTML(b, it) {
 function prDetailHTML(p) {
   const staff = isStaff();
   const editable = staff && ['da_duyet', 'da_dat', 'dang_giao', 'co_van_de', 'da_ve'].includes(p.status);
-  const canCancel = (p.requested_by === S.user.id && p.status === 'cho_duyet') || (staff && !['da_ve', 'huy'].includes(p.status));
+  const owner = p.requested_by === S.user.id;
+  const canCancel = (owner && ['cho_duyet', 'thu_hoi', 'tu_choi'].includes(p.status)) || (staff && !['da_ve', 'huy'].includes(p.status));
+  const canRecall = (owner || staff) && ['cho_duyet', 'tu_choi', 'da_duyet', 'da_dat'].includes(p.status)
+    && !p.its.some(i => i.batches.some(b => ['dang_giao', 'da_ve', 'co_van_de'].includes(b.status)));
   const canAddImg = p.requested_by === S.user.id || staff || (S.profile.site_id && S.profile.site_id === p.site_id);
   const conf = canConfirm(p) && !['cho_duyet', 'tu_choi', 'huy'].includes(p.status);
   const bOpts = sel => OPEN_ST.map(k => `<option value="${k}" ${k === sel ? 'selected' : ''}>${IT_ST[k][0]}</option>`).join('');
@@ -252,12 +255,14 @@ function prDetailHTML(p) {
   }).join('');
 
   return `<div class="toolbar mb">
-      <div><b>${esc(p.title || '')}</b><div class="small muted">${p.delivery_place ? `📍 ${esc(p.delivery_place)} · ` : ''}${p.note ? `📝 ${esc(p.note)} · ` : ''}Nguồn: ${p.source === 'bot' ? 'Bot Telegram' : 'Web app'}
+      <div><b class="mono">${esc(p.pr_no)}</b>${p.title && p.title !== p.pr_no ? ` — <b>${esc(p.title)}</b>` : ''}<div class="small muted">${p.delivery_place ? `📍 Nơi nhận: ${esc(p.delivery_place)} · ` : ''}${p.note ? `📝 ${esc(p.note)} · ` : ''}Nguồn: ${p.source === 'bot' ? 'Bot Telegram' : 'Web app'}
         ${p.approved_by ? ` · ${p.status === 'tu_choi' ? 'Từ chối' : 'Duyệt'} bởi ${esc(profName(p.approved_by))} lúc ${esc(fmtDT(p.approved_at))}` : ''}
         ${p.reject_reason ? ` · <span class="late-text">Lý do: ${esc(p.reject_reason)}</span>` : ''}</div></div>
       <span class="spacer"></span>
       ${staff && p.status === 'cho_duyet' ? `<button class="btn sm ok" data-act="approve" data-pr="${esc(p.pr_no)}" title="Duyệt và tự lập kế hoạch giao: lấy kho tổng trước, phần thiếu → cần mua">✅ Duyệt</button><button class="btn sm danger" data-act="reject" data-pr="${esc(p.pr_no)}">❌ Từ chối</button>` : ''}
       ${editable && p.status !== 'da_ve' ? `<button class="btn sm" data-act="bulk" data-pr="${esc(p.pr_no)}">Cập nhật nhanh cả phiếu…</button>` : ''}
+      ${canRecall ? `<button class="btn sm" data-act="recall" data-pr="${esc(p.pr_no)}" data-id="${p.id}" title="Thu hồi để sửa khi đặt nhầm">↩ Thu hồi & sửa</button>` : ''}
+      ${p.status === 'thu_hoi' && (owner || staff) ? `<button class="btn sm primary" data-act="load-pr-edit" data-id="${p.id}">✏ Tiếp tục sửa</button>` : ''}
       ${canAddImg ? `<button class="btn sm" data-act="pr-add-img" data-pr="${esc(p.pr_no)}">📷 Thêm ảnh</button>` : ''}
       ${canCancel ? `<button class="btn sm danger" data-act="cancel" data-pr="${esc(p.pr_no)}">Huỷ phiếu</button>` : ''}
     </div>
@@ -411,6 +416,15 @@ Object.assign(ACT, {
   'pr-add-img': async b => {
     const imgs = await filesToImages(await pickFiles(true), {}); if (!imgs.length) return;
     runAction(async () => { const files = await uploadImages(imgs); await ctx.B.addAttachments(b.dataset.pr, files); }, `Đã thêm ${imgs.length} ảnh vào ${b.dataset.pr}`);
+  },
+  recall: async b => {
+    const { action, data } = await modal({ title: `Thu hồi ${b.dataset.pr} để sửa?`,
+      body: `<p>PR sẽ chuyển sang <b>Đã thu hồi – đang sửa</b>. Kế hoạch giao và hàng đang giữ ở kho tổng được nhả ra. Sau khi sửa và gửi lại, PR thành bản <b>R</b> tiếp theo và chờ duyệt lại.</p>
+        <label class="f">Lý do (không bắt buộc)<input id="rc-reason" placeholder="vd: Đặt nhầm số lượng / nhầm quy cách"></label>`,
+      actions: [{ label: 'Không', value: null }, { label: 'Thu hồi & sửa', value: 'ok', primary: true }], read: ov => $('#rc-reason', ov).value });
+    if (action !== 'ok') return;
+    const ok = await runAction(() => ctx.B.recallPR(b.dataset.pr, data), `Đã thu hồi ${b.dataset.pr}`);
+    if (ok && ACT['load-pr-edit']) ACT['load-pr-edit']({ dataset: { id: b.dataset.id } });
   },
   receive: b => receiveDialog(b.dataset.id),
   resolve: b => resolveDialog(b.dataset.id),

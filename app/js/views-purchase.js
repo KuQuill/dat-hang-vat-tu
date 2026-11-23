@@ -142,15 +142,9 @@ Object.assign(ACT, {
   'pp-manual': async () => {
     const { action, data } = await modal({
       title: 'Đề xuất mua bổ sung kho tổng',
-      body: `<p class="small muted">Mỗi dòng: <b>Mã VT · Số lượng · Ngày cần (tuỳ chọn) · Ghi chú</b>. Ví dụ mua dự trữ vật tư dưới mức tối thiểu.</p>
+      body: `<p class="small muted">Mỗi dòng: <b>Mã VT · Số lượng · Ngày cần (tuỳ chọn) · Ghi chú</b>. Ví dụ mua dự trữ cho kho tổng.</p>
         <div class="form"><label class="f full"><span class="req">Tiêu đề</span><input id="pm-title" value="Mua bổ sung kho tổng ${fmtD(todayISO())}"></label></div>
-        <textarea id="pm-box" rows="8" placeholder="KC-0005\t300\nDC-0003\t50"></textarea>
-        <p class="small"><button class="linkbtn" id="pm-low" type="button">Điền sẵn các mã dưới mức tồn tối thiểu</button></p>`,
-      onOpen: ov => $('#pm-low', ov).addEventListener('click', () => {
-        const dd = D();
-        $('#pm-box', ov).value = S.stock.filter(s => !s.site_id && s.min_qty != null && Number(s.qty) < Number(s.min_qty))
-          .map(s => `${dd.mat.get(s.material_id).code}\t${round6(Number(s.min_qty) - Number(s.qty))}\t\tDưới tối thiểu`).join('\n');
-      }),
+        <textarea id="pm-box" rows="8" placeholder="KC-0005\t300\nDC-0003\t50"></textarea>`,
       actions: [{ label: 'Huỷ', value: null }, { label: 'Gửi Thu mua', value: 'ok', primary: true, validate: v => !v.title.trim() ? 'Nhập tiêu đề' : !parsePaste(v.text).length ? 'Chưa có dòng nào' : null }],
       read: ov => ({ title: $('#pm-title', ov).value, text: $('#pm-box', ov).value }),
     });
