@@ -63,7 +63,7 @@ Phòng vật tư chuyển đợt sang "Đang giao" ──► Công trường b�
 - Người đặt (hoặc phòng vật tư) thu hồi được; người đặt huỷ được PR khi chờ duyệt / đã thu hồi / bị từ chối.
 
 ### Xuất PDF để ký
-Ở màn hình Theo dõi (hoặc ngay sau khi gửi PR) bấm **⬇ Xuất PDF** → tải file `SỐ-PR.pdf`: phiếu đề nghị cấp vật tư A4 gồm thông tin PR, bảng vật tư và 4 ô ký (Người đề nghị · Chỉ huy trưởng · Phòng vật tư · Ban giám đốc) để ký và gửi lên nhóm.
+Ở màn hình Theo dõi (hoặc ngay sau khi gửi PR) bấm **⬇ Xuất PDF** → tải file `SỐ-PR.pdf`: phiếu đề nghị cấp vật tư A4 gồm thông tin PR, bảng vật tư và 2 ô ký (Người đặt hàng · Chỉ huy trưởng) để ký và gửi lên nhóm.
 
 ### Dự án / công trường
 Màn hình **Dự án** (phòng vật tư, quản trị): thêm / sửa **mã dự án**, tên dự án, địa chỉ, chỉ huy trưởng, ngừng dự án.

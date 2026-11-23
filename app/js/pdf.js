@@ -27,7 +27,7 @@ export function docHTML(pr) {
   ];
   if (pr.title && pr.title !== pr.pr_no) info.push(['Diễn giải', esc(pr.title)]);
   if (pr.note) info.push(['Ghi chú', esc(pr.note)]);
-  const sig = (t, name) => `<td style="width:25%;text-align:center;vertical-align:top;padding:4px">
+  const sig = (t, name) => `<td style="width:50%;text-align:center;vertical-align:top;padding:4px">
       <div style="font-weight:700">${t}</div><div style="font-style:italic;font-size:11px">(Ký, ghi rõ họ tên)</div>
       <div style="height:78px"></div><div style="font-weight:600">${esc(name || '')}</div></td>`;
   return `<div style="font-family:'Times New Roman',Times,serif;font-size:13px;color:#000;background:#fff;width:190mm;padding:2mm">
@@ -49,7 +49,7 @@ export function docHTML(pr) {
       </tbody></table>
     <div style="margin-top:6px;font-size:12px">Tổng số: <b>${its.length}</b> dòng vật tư · Trạng thái trên hệ thống: ${esc((PR_ST[pr.status] || [pr.status])[0])}</div>
     <table style="width:100%;border-collapse:collapse;margin-top:22px;page-break-inside:avoid"><tr>
-      ${sig('Người đề nghị', requester)}${sig('Chỉ huy trưởng', site.manager)}${sig('Phòng vật tư', '')}${sig('Ban giám đốc', '')}</tr></table>
+      ${sig('Người đặt hàng', requester)}${sig('Chỉ huy trưởng', site.manager)}</tr></table>
     <div style="margin-top:16px;font-size:10.5px;color:#555;text-align:right">In từ hệ thống đặt hàng vật tư lúc ${esc(fmtDT(new Date().toISOString()))}</div>
   </div>`;
 }
