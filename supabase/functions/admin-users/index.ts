@@ -38,6 +38,9 @@ Deno.serve(async (req) => {
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "Dữ liệu không hợp lệ" }, 400); }
+  // Ghi nhật ký hoạt động kèm người thực hiện (trigger không biết ai gọi khi dùng service role)
+  const audit = (action: string, row_id: string, ref: string, changes: unknown) =>
+    admin.from("audit_log").insert({ actor: user.id, action, tbl: "profiles", row_id, ref, changes }).then(() => {}, () => {});
   const str = (k: string) => (typeof body[k] === "string" ? (body[k] as string).trim() : "");
 
   try {
@@ -64,12 +67,14 @@ Deno.serve(async (req) => {
           active: true,
         }).eq("id", data.user.id);
         if (e2) return json({ error: e2.message }, 400);
+        await audit("user_create", data.user.id, email, { full_name: str("full_name") || email.split("@")[0], role, site_id: str("site_id") || null });
         return json({ id: data.user.id });
       }
 
       case "update": {
         const id = str("id");
         if (!id) return json({ error: "Thiếu id" }, 400);
+        const { data: before } = await admin.from("profiles").select("email, full_name, phone, role, site_id, active").eq("id", id).single();
         const patch: Record<string, unknown> = {};
         if ("full_name" in body) patch.full_name = str("full_name") || null;
         if ("phone" in body) patch.phone = str("phone") || null;
@@ -87,6 +92,12 @@ Deno.serve(async (req) => {
         }
         const { error } = await admin.from("profiles").update(patch).eq("id", id);
         if (error) return json({ error: error.message }, 400);
+        const diff: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(patch)) {
+          const old = before ? (before as Record<string, unknown>)[k] ?? null : null;
+          if (old !== v) diff[k] = [old, v];
+        }
+        if (Object.keys(diff).length) await audit("user_update", id, before?.email ?? "", diff);
         return json({ ok: true });
       }
 
@@ -97,6 +108,8 @@ Deno.serve(async (req) => {
         if (password.length < 8) return json({ error: "Mật khẩu tối thiểu 8 ký tự" }, 400);
         const { error } = await admin.auth.admin.updateUserById(id, { password });
         if (error) return json({ error: error.message }, 400);
+        const { data: who } = await admin.from("profiles").select("email").eq("id", id).single();
+        await audit("user_reset_pw", id, who?.email ?? "", null);
         return json({ ok: true });
       }
 

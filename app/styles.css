@@ -220,3 +220,9 @@ body.login-page .login{margin:max(8vh,32px) 5vw 40px auto;max-width:420px;backgr
     background-position:left top;background-attachment:scroll;background-size:auto 100vh}
   body.login-page .login{margin:34vh auto 24px}
 }
+
+/* Nhật ký hoạt động */
+.log-table{min-width:900px} .log-table td{vertical-align:top}
+.log-filter{flex-wrap:wrap;gap:8px} .log-filter select,.log-filter input[type=date]{width:auto;min-width:150px;flex:0 1 auto} .log-filter label{display:flex;align-items:center;gap:4px}
+.log-detail{margin-top:6px;padding:6px 8px;background:var(--bg-soft,#f4f6ee);border-radius:6px;line-height:1.5;word-break:break-word}
+.btn.link{background:none;border:none;color:var(--accent);padding:0;text-decoration:underline;cursor:pointer}

@@ -23,7 +23,11 @@ export function SupaBackend() {
   }
   return {
     async session() { const { data } = await sb.auth.getSession(); return data.session ? data.session.user : null; },
-    async signIn(email, password) { const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw toErr(error); return data.user; },
+    async signIn(email, password) {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password }); if (error) throw toErr(error);
+      sb.rpc('log_login').then(() => {}, () => {}); // ghi nhật ký đăng nhập, lỗi cũng không chặn
+      return data.user;
+    },
     async signOut() { await sb.auth.signOut(); },
     async changePassword(pw) { const { error } = await sb.auth.updateUser({ password: pw }); if (error) throw toErr(error); },
 
@@ -67,6 +71,17 @@ export function SupaBackend() {
     async assetHistory(id) {
       const { data, error } = await sb.from('asset_history').select('*').eq('asset_id', id).order('created_at', { ascending: false }).limit(200);
       if (error) throw toErr(error); return data;
+    },
+    async auditLog(f) {
+      let q = sb.from('audit_log').select('*').order('id', { ascending: false }).limit(f.limit || 200);
+      if (f.action) q = q.eq('action', f.action);
+      if (f.tbls) q = q.in('tbl', f.tbls);
+      if (f.actor) q = q.eq('actor', f.actor);
+      if (f.from) q = q.gte('at', f.from);
+      if (f.to) q = q.lte('at', f.to);
+      if (f.before) q = q.lt('id', f.before);
+      if (f.q) q = q.ilike('ref', `%${f.q.replace(/[%_,()]/g, ' ')}%`);
+      const { data, error } = await q; if (error) throw toErr(error); return data;
     },
     async uploadImage(blob) {
       const path = `${S.user.id}/${uid()}.jpg`;

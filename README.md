@@ -54,6 +54,7 @@ Phòng vật tư chuyển đợt sang "Đang giao" ──► Công trường b�
 | **5. Đề xuất mua** | Phòng vật tư | Danh sách cần mua → lập đề xuất → cập nhật trạng thái, NCC, đơn giá, ngày về, PO |
 | **Dự án** | Quản lý · Quản trị | Khai báo dự án, hạng mục thi công |
 | **6. Tài khoản** | Quản trị | Tạo tài khoản, đổi quyền, gán công trường, khoá, đặt lại mật khẩu |
+| **7. Nhật ký** | Quản trị | Mọi lần thêm / sửa / xoá dữ liệu, đăng nhập, thao tác tài khoản: ai, lúc nào, trường nào đổi từ gì sang gì. Lọc theo nhóm, người, ngày, mã; xuất CSV. Không ai sửa / xoá được nhật ký |
 
 ### Số PR & thu hồi / sửa PR
 - Số PR tự sinh theo dự án: **`<Mã dự án>.<Hạng mục>.PR<số>.R<lần sửa>`**, vd `SSD.MEP.PR01.R1`.
@@ -112,7 +113,7 @@ Phòng vật tư thêm nhóm / nhóm con trong *Kho & tài sản → 🗂 Nhóm 
 ## Bước 1 — Tạo Supabase
 
 1. https://supabase.com → **New project** → Region **Southeast Asia (Singapore)**.
-2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql`, `004_roles_manager.sql`, `005_workshop_alloc.sql` (thư mục `supabase/migrations/`).
+2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql`, `004_roles_manager.sql`, `005_workshop_alloc.sql`, `006_audit_log.sql` (thư mục `supabase/migrations/`).
 3. Thêm công trường:
    ```sql
    insert into public.sites (code, name, address, manager) values

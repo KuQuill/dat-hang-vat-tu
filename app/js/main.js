@@ -9,6 +9,7 @@ import './views-purchase.js';
 import './views-sites.js';
 import './pdf.js';
 import './views-users.js';
+import './views-log.js';
 
 /* ---------- Bộ đệm & đồng bộ ---------- */
 const stripMat = m => { const { _n, _tg, _tok, _code, ...x } = m; return x; };

@@ -328,7 +328,34 @@ export function DemoBackend() {
   const clone = x => JSON.parse(JSON.stringify(x));
   const delay = v => new Promise(r => setTimeout(() => r(v), 100));
   // Mô phỏng transaction: lỗi giữa chừng thì khôi phục dữ liệu
-  const tx = fn => { const snap = JSON.stringify(db); try { const r = fn(); save(); return delay(r); } catch (e) { db = JSON.parse(snap); return Promise.reject(e); } };
+  // Nhật ký hoạt động: so sánh dữ liệu trước / sau mỗi thao tác (giống trigger audit trên Supabase)
+  const AUD = { sites: 'sites', profiles: 'profiles', workCats: 'work_categories', groups: 'material_groups', subgroups: 'material_subgroups', materials: 'materials',
+                stock: 'stock', assets: 'assets', prs: 'purchase_requests', items: 'pr_items', deliveries: 'pr_deliveries', atts: 'pr_attachments',
+                proposals: 'purchase_proposals', lines: 'proposal_lines' };
+  const audRef = r => r.pr_no || r.pp_no || r.asset_code || r.code || r.email || r.file_name || r.title || r.name ||
+                      (r.batch_no != null ? 'Đợt ' + r.batch_no : r.line_no != null ? 'Dòng ' + r.line_no : null);
+  const audPush = (action, tbl, r, changes) => {
+    db.audit = db.audit || []; db.auditSeq = (db.auditSeq || 0) + 1;
+    db.audit.push({ id: db.auditSeq, at: now(), actor: (me() || {}).id || null, action, tbl, row_id: r ? String(r.id ?? r.code) : null, ref: r ? audRef(r) : null,
+                    parent: r ? (r.pr_id || r.item_id || r.proposal_id || r.material_id || null) : null, changes });
+    if (db.audit.length > 3000) db.audit.splice(0, db.audit.length - 3000);
+  };
+  function audit(before) {
+    const key = r => r.id ?? r.code;
+    for (const [k, tbl] of Object.entries(AUD)) {
+      const old = new Map((before[k] || []).map(r => [key(r), r])), seen = new Set();
+      for (const r of db[k] || []) {
+        const id = key(r); seen.add(id); const o = old.get(id);
+        if (!o) { const { updated_at, ...rest } = r; audPush('insert', tbl, r, rest); continue; }
+        const diff = {};
+        for (const f of new Set([...Object.keys(o), ...Object.keys(r)]))
+          if (f !== 'updated_at' && f !== 'seq' && JSON.stringify(o[f] ?? null) !== JSON.stringify(r[f] ?? null)) diff[f] = [o[f] ?? null, r[f] ?? null];
+        if (Object.keys(diff).length) audPush('update', tbl, r, diff);
+      }
+      for (const [id, o] of old) if (!seen.has(id)) { const { updated_at, ...rest } = o; audPush('delete', tbl, o, rest); }
+    }
+  }
+  const tx = fn => { const snap = JSON.stringify(db); try { const r = fn(); audit(JSON.parse(snap)); save(); return delay(r); } catch (e) { db = JSON.parse(snap); return Promise.reject(e); } };
 
   /* ---------- API (giống backend Supabase) ---------- */
   return {
@@ -338,7 +365,8 @@ export function DemoBackend() {
       const p = db.profiles.find(x => x.email.toLowerCase() === String(email).trim().toLowerCase());
       if (!p) fail('Tài khoản demo: site@demo.vn, vattu@demo.vn, thumua@demo.vn hoặc admin@demo.vn (mật khẩu bất kỳ)');
       if (!p.active) fail('Tài khoản đã bị khoá');
-      LS.set(KEY.demouser, p.id); return { id: p.id, email: p.email };
+      LS.set(KEY.demouser, p.id); audPush('login', null, null, null); db.audit[db.audit.length - 1].ref = p.email; save();
+      return { id: p.id, email: p.email };
     },
     async signOut() { LS.del(KEY.demouser); },
     async changePassword(pw) { if (String(pw).length < 8) fail('Mật khẩu tối thiểu 8 ký tự'); return delay(null); },
@@ -347,6 +375,13 @@ export function DemoBackend() {
         proposals: db.proposals, lines: db.lines, links: db.links, prs: db.prs, items: db.items, atts: db.atts, deliveries: db.deliveries, changedItems: null, full: true }));
     },
     async assetHistory(id) { return delay(clone(db.assetHistory.filter(h => h.asset_id === id).sort((a, b) => b.created_at.localeCompare(a.created_at)))); },
+    async auditLog(f) {
+      if ((me() || {}).role !== 'admin') fail('Chỉ quản trị mới xem được nhật ký');
+      const q = (f.q || '').toLowerCase();
+      const rows = (db.audit || []).filter(r => (!f.action || r.action === f.action) && (!f.tbls || f.tbls.includes(r.tbl)) && (!f.actor || r.actor === f.actor)
+        && (!f.from || r.at >= f.from) && (!f.to || r.at <= f.to) && (!f.before || r.id < f.before) && (!q || String(r.ref || '').toLowerCase().includes(q)));
+      return delay(clone(rows.sort((a, b) => b.id - a.id).slice(0, f.limit || 200)));
+    },
     async uploadImage(blob) {
       const u = me() || fail('Bạn chưa đăng nhập');
       const path = `${u.id}/${uid()}.jpg`; db.blobs[path] = await blobToDataURL(await compressImage(blob, 800, 0.6)); save(); return path;
