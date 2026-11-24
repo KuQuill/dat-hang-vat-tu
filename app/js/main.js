@@ -111,6 +111,7 @@ hooks.renderChrome = renderChrome;
 
 function render() {
   document.dispatchEvent(new Event('app:before-render'));
+  document.body.classList.toggle('login-page', !S.user);
   renderChrome();
   const v = $('#view');
   if (!S.user) { v.innerHTML = viewLogin(); return; }
@@ -125,7 +126,7 @@ hooks.refresh = () => { const view = VIEWS[S.tab]; if (view && view.refresh) vie
 /* ---------- Đăng nhập ---------- */
 function viewLogin() {
   return `<div class="card login">
-    <div class="login-brand"><img src="icons/logo.svg" alt=""><div class="co">${esc(CONFIG.COMPANY)}</div><div class="app">Hệ thống đặt hàng vật tư công trường</div></div>
+    <div class="login-brand"><img src="icons/logo.png" alt=""><div class="co">${esc(CONFIG.COMPANY)}</div><div class="app">Hệ thống đặt hàng vật tư công trường</div></div>
     <h2>Đăng nhập</h2>
     <p class="muted small">Đăng nhập bằng <b>email và mật khẩu công ty cấp</b>. Quên mật khẩu hoặc chưa có tài khoản: liên hệ quản trị hệ thống.</p>
     <div class="form">

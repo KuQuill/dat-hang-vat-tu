@@ -37,7 +37,7 @@ export function docHTML(pr) {
       <div style="height:78px"></div><div style="font-weight:600">${esc(name || '')}</div></td>`;
   return `<div style="font-family:'Times New Roman',Times,serif;font-size:13px;color:#000;background:#fff;width:190mm;padding:2mm">
     <table style="width:100%;border-collapse:collapse"><tr>
-      <td style="vertical-align:top;width:62px"><img src="${new URL('icons/logo.svg', location.href).href}" alt="" style="width:54px;height:54px;display:block"></td>
+      <td style="vertical-align:top;width:62px"><img src="${new URL('icons/logo-1024.png', location.href).href}" alt="" style="width:54px;height:54px;display:block"></td>
       <td style="vertical-align:top"><div style="font-weight:700;font-size:15px;color:#44502a">${esc(CONFIG.COMPANY)}</div>
         <div style="font-size:12px">Dự án: ${esc(site.name || site.code || '')}</div></td>
       <td style="vertical-align:top;text-align:right;font-size:12px">Số: <b style="font-size:14px">${esc(pr.pr_no)}</b><br>Ngày lập: ${esc(fmtD(vnDate(pr.created_at)))}
