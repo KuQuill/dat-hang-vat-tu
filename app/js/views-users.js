@@ -1,5 +1,5 @@
 // Tài khoản (chỉ quản trị): tạo lẻ, nhập hàng loạt từ CSV, sửa quyền / dự án, khoá, đặt lại mật khẩu
-import { S, ctx, ACT, VIEWS, INPUTS, DEMO, hooks, $, esc, norm, debounce, modal, toast, runAction, ROLE, siteOptions, siteByCode, isAdmin,
+import { S, ctx, ACT, VIEWS, INPUTS, DEMO, hooks, $, esc, norm, debounce, modal, confirmBox, toast, runAction, ROLE, siteOptions, siteByCode, isAdmin,
          genPassword, downloadText, parsePaste } from './core.js';
 
 VIEWS.users = {
@@ -31,7 +31,7 @@ function renderUsers() {
       <td><select data-u="role">${roleOpts(p.role)}</select></td>
       <td><select data-u="site_id">${siteOptions(p.site_id || '', '—', true)}</select></td>
       <td><label class="nowrap"><input type="checkbox" data-u="active" ${p.active !== false ? 'checked' : ''}> ${p.active !== false ? 'Đang dùng' : 'Đã khoá'}</label></td>
-      <td class="nowrap"><button class="btn sm" data-act="user-save" data-uid="${p.id}">Lưu</button> <button class="btn sm" data-act="user-reset" data-uid="${p.id}">Đặt lại MK</button></td>
+      <td class="nowrap"><button class="btn sm" data-act="user-save" data-uid="${p.id}">Lưu</button> <button class="btn sm" data-act="user-reset" data-uid="${p.id}">Đặt lại MK</button>${p.id === S.user.id ? '' : ` <button class="btn sm danger" data-act="user-del" data-uid="${p.id}" title="Xoá tài khoản">🗑</button>`}</td>
     </tr>`).join('')}</tbody></table></div>`;
 }
 const onU = debounce(renderUsers, 200);
@@ -158,6 +158,12 @@ Object.assign(ACT, {
   'user-save': b => {
     const tr = b.closest('tr'); const v = k => $(`[data-u="${k}"]`, tr);
     runAction(() => ctx.B.adminUsers({ action: 'update', id: b.dataset.uid, full_name: v('full_name').value, role: v('role').value, site_id: v('site_id').value, active: v('active').checked }), 'Đã lưu tài khoản');
+  },
+  'user-del': async b => {
+    const p = S.profiles.find(x => x.id === b.dataset.uid); if (!p) return;
+    const ok = await confirmBox(`Xoá tài khoản ${p.email || ''}`, `<p>Xoá hẳn tài khoản <b>${esc(p.full_name || p.email || '')}</b> (${esc(p.email || '')})? Người này sẽ không đăng nhập được nữa và <b>không khôi phục được</b>.</p>
+      <p class="small muted">Chỉ xoá được tài khoản chưa có dữ liệu (chưa lập / duyệt PR, nhận hàng, sửa kho…). Tài khoản đã làm việc thì bỏ dấu "Đang dùng" để khoá — lịch sử vẫn giữ tên người đó.</p>`, '🗑 Xoá tài khoản', true);
+    if (ok) runAction(() => ctx.B.adminUsers({ action: 'delete', id: p.id }), `Đã xoá tài khoản ${p.email || ''}`);
   },
   'user-reset': async b => {
     const p = S.profiles.find(x => x.id === b.dataset.uid); const pw = genPassword();

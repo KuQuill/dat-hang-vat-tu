@@ -1,5 +1,5 @@
 // Dự án / công trường: mã dự án (dùng trong số PR), tên dự án, địa chỉ, chỉ huy trưởng
-import { S, ctx, ACT, VIEWS, hooks, $, esc, modal, runAction, isMgr, profName } from './core.js';
+import { S, ctx, ACT, VIEWS, hooks, $, esc, modal, confirmBox, runAction, isMgr, profName } from './core.js';
 
 VIEWS.sites = {
   title: 'Dự án',
@@ -31,7 +31,7 @@ function renderSites() {
       <td class="mono"><b>${esc(s.code)}</b></td><td>${esc(s.name)}${s.is_workshop ? ' <span class="badge b-violet">🏭 Xưởng</span>' : ''}</td><td class="small">${esc(s.address || '')}</td><td>${esc(s.manager || '')}</td>
       <td class="right">${count(s.id)}</td><td class="right">${people(s.id)}</td>
       <td>${s.active === false ? '<span class="badge b-gray">Ngừng</span>' : '<span class="badge b-green">Đang thi công</span>'}</td>
-      <td><button class="btn sm" data-act="site-edit" data-id="${s.id}">✏ Sửa</button></td></tr>`).join('')}</tbody></table></div>`
+      <td class="nowrap"><button class="btn sm" data-act="site-edit" data-id="${s.id}">✏ Sửa</button>${count(s.id) ? '' : ` <button class="btn sm danger" data-act="site-del" data-id="${s.id}" title="Xoá dự án">🗑</button>`}</td></tr>`).join('')}</tbody></table></div>`
     : '<div class="card empty">Chưa có dự án nào. Bấm ＋ Thêm dự án.</div>';
 }
 async function siteDialog(s) {
@@ -59,7 +59,7 @@ function renderWC() {
   $('#wc-table').innerHTML = `<div class="table-wrap"><table class="sites-table"><thead><tr><th>Mã</th><th>Tên hạng mục thi công</th><th class="right">Thứ tự</th><th class="right">Số PR</th><th>Trạng thái</th><th></th></tr></thead>
     <tbody>${list.map(w => `<tr class="${w.active === false ? 'muted-row' : ''}"><td class="mono"><b>${esc(w.code)}</b></td><td>${esc(w.name)}</td><td class="right">${w.sort}</td><td class="right">${used(w.code)}</td>
       <td>${w.active === false ? '<span class="badge b-gray">Ẩn</span>' : '<span class="badge b-green">Đang dùng</span>'}</td>
-      <td><button class="btn sm" data-act="wc-edit" data-code="${esc(w.code)}">✏ Sửa</button></td></tr>`).join('')}</tbody></table></div>`;
+      <td class="nowrap"><button class="btn sm" data-act="wc-edit" data-code="${esc(w.code)}">✏ Sửa</button>${used(w.code) ? '' : ` <button class="btn sm danger" data-act="wc-del" data-code="${esc(w.code)}" title="Xoá hạng mục">🗑</button>`}</td></tr>`).join('')}</tbody></table></div>`;
 }
 async function wcDialog(w) {
   const { action, data } = await modal({
@@ -78,6 +78,19 @@ async function wcDialog(w) {
 Object.assign(ACT, {
   'wc-new': () => wcDialog(null),
   'wc-edit': b => wcDialog((S.workCats || []).find(w => w.code === b.dataset.code)),
+  'wc-del': async b => {
+    const w = (S.workCats || []).find(x => x.code === b.dataset.code); if (!w) return;
+    if (await confirmBox(`Xoá hạng mục ${w.code}`, `<p>Xoá hạng mục <b>${esc(w.code)} — ${esc(w.name)}</b>? Thao tác này không hoàn tác được.</p>`, '🗑 Xoá hạng mục', true))
+      runAction(() => ctx.B.deleteWorkCategory(w.code), `Đã xoá hạng mục ${w.code}`);
+  },
+  'site-del': async b => {
+    const s = S.sites.find(x => x.id === b.dataset.id); if (!s) return;
+    const ppl = S.profiles.filter(p => p.site_id === s.id).length;
+    if (await confirmBox(`Xoá dự án ${s.code}`, `<p>Xoá dự án <b>${esc(s.code)} — ${esc(s.name)}</b>? Thao tác này không hoàn tác được.</p>
+        ${ppl ? `<p class="small">${ppl} tài khoản đang gán dự án này sẽ được bỏ gán (chuyển về "—").</p>` : ''}
+        <p class="small muted">Dự án còn tồn kho hoặc tài sản thì phải chuyển đi trước khi xoá.</p>`, '🗑 Xoá dự án', true))
+      runAction(() => ctx.B.deleteSite(s.id), `Đã xoá dự án ${s.code}`);
+  },
   'site-new': () => siteDialog(null),
   'site-edit': b => siteDialog(S.sites.find(x => x.id === b.dataset.id)),
 });

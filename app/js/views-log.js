@@ -14,7 +14,7 @@ const GROUPS = {
 };
 const ACTION = {
   insert: ['Thêm', 'b-green'], update: ['Sửa', 'b-blue'], delete: ['Xoá', 'b-red'], login: ['Đăng nhập', 'b-gray'],
-  user_create: ['Tạo tài khoản', 'b-green'], user_update: ['Sửa tài khoản', 'b-blue'], user_reset_pw: ['Đặt lại mật khẩu', 'b-amber'],
+  user_create: ['Tạo tài khoản', 'b-green'], user_update: ['Sửa tài khoản', 'b-blue'], user_reset_pw: ['Đặt lại mật khẩu', 'b-amber'], user_delete: ['Xoá tài khoản', 'b-red'],
 };
 const FIELD = {
   status: 'Trạng thái', qty: 'Số lượng', qty_actual: 'SL thực nhận', unit: 'ĐVT', need_date: 'Ngày cần', eta: 'Ngày dự kiến về', supplier: 'Nhà cung cấp',

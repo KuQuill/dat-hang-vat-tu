@@ -435,6 +435,24 @@ export function DemoBackend() {
       if (x) Object.assign(x, vals); else db.workCats.push(vals);
       return null;
     }),
+    deleteWorkCategory: code => tx(() => {
+      req(['manager', 'admin']);
+      const i = db.workCats.findIndex(w => w.code === code); if (i < 0) fail(`Không tìm thấy hạng mục ${code}`);
+      const n = db.prs.filter(p => p.category === code).length;
+      if (n) fail(`Hạng mục ${code} đã dùng trong ${n} PR — không xoá được. Hãy chuyển sang "Ẩn khỏi danh sách đặt hàng".`);
+      db.workCats.splice(i, 1); return null;
+    }),
+    deleteSite: id => tx(() => {
+      req(['manager', 'admin']);
+      const i = db.sites.findIndex(s => s.id === id); if (i < 0) fail('Không tìm thấy dự án');
+      const code = db.sites[i].code, n = db.prs.filter(p => p.site_id === id).length;
+      if (n) fail(`Dự án ${code} đã có ${n} PR — không xoá được. Hãy chuyển trạng thái sang "Ngừng" để ẩn.`);
+      if (db.items.some(it => (it.alloc || []).some(a => a.site_id === id))) fail(`Dự án ${code} đang được xưởng chia hàng trong PR — không xoá được. Hãy chuyển sang "Ngừng".`);
+      if (db.stock.some(s => s.site_id === id)) fail(`Dự án ${code} còn dòng tồn kho — chuyển hết tồn kho đi trước, hoặc chuyển sang "Ngừng".`);
+      if (db.assets.some(a => a.site_id === id)) fail(`Dự án ${code} còn tài sản / thiết bị — chuyển tài sản đi trước, hoặc chuyển sang "Ngừng".`);
+      for (const p of db.profiles) if (p.site_id === id) p.site_id = null;
+      db.sites.splice(i, 1); return code;
+    }),
     upsertSite: st => tx(() => {
       req(['manager', 'admin']);
       const code = String(st.code || '').replace(/\s/g, '').toUpperCase();
@@ -789,6 +807,17 @@ export function DemoBackend() {
         if ('role' in b && !ROLES.includes(b.role)) fail('Quyền không hợp lệ');
         for (const k of ['full_name', 'phone', 'role', 'site_id']) if (k in b) p[k] = String(b[k] || '').trim() || null;
         if ('active' in b) p.active = !!b.active;
+        return { ok: true };
+      }
+      if (b.action === 'delete') {
+        if (p.id === u.id) fail('Không thể tự xoá tài khoản của mình');
+        const REFS = [['prs', 'requested_by', 'PR đã lập'], ['prs', 'approved_by', 'PR đã duyệt'], ['history', 'changed_by', 'lịch sử PR'], ['deliveries', 'confirmed_by', 'lần nhận hàng'],
+          ['deliveries', 'resolved_by', 'xử lý giao hàng'], ['atts', 'uploaded_by', 'file đính kèm'], ['proposals', 'created_by', 'đề xuất mua'], ['proposals', 'handled_by', 'đề xuất mua'],
+          ['stock', 'updated_by', 'dòng tồn kho'], ['stockLog', 'changed_by', 'lịch sử kho'], ['materials', 'created_by', 'vật tư đã tạo'], ['assets', 'created_by', 'tài sản'], ['assetHistory', 'changed_by', 'lịch sử tài sản']];
+        const used = [...new Set(REFS.filter(([t, c]) => (db[t] || []).some(r => r[c] === p.id)).map(r => r[2]))];
+        if (used.length) fail(`Tài khoản đã có dữ liệu (${used.join(', ')}) nên không xoá được — hãy bỏ dấu "Đang dùng" để khoá tài khoản.`);
+        db.profiles.splice(db.profiles.indexOf(p), 1);
+        for (const a of db.audit || []) if (a.actor === p.id) a.actor = null;
         return { ok: true };
       }
       if (b.action === 'reset_password') { if (String(b.password || '').length < 8) fail('Mật khẩu tối thiểu 8 ký tự'); return { ok: true }; }

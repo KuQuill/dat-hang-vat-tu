@@ -1,5 +1,5 @@
 // Edge Function: admin-users
-// Cho phép tài khoản có quyền 'admin' tạo / sửa / khoá tài khoản và đặt lại mật khẩu
+// Cho phép tài khoản có quyền 'admin' tạo / sửa / khoá / xoá tài khoản và đặt lại mật khẩu
 // ngay trong file HTML (Sheet "Tài khoản").
 //
 // Triển khai:  supabase functions deploy admin-users
@@ -110,6 +110,34 @@ Deno.serve(async (req) => {
         if (error) return json({ error: error.message }, 400);
         const { data: who } = await admin.from("profiles").select("email").eq("id", id).single();
         await audit("user_reset_pw", id, who?.email ?? "", null);
+        return json({ ok: true });
+      }
+
+      case "delete": {
+        // Chỉ xoá được tài khoản chưa có dữ liệu (PR, giao nhận, kho…). Có rồi → khoá để giữ lịch sử.
+        const id = str("id");
+        if (!id) return json({ error: "Thiếu id" }, 400);
+        if (id === user.id) return json({ error: "Không thể tự xoá tài khoản của mình" }, 400);
+        const { data: p } = await admin.from("profiles").select("email, full_name, role, site_id").eq("id", id).single();
+        if (!p) return json({ error: "Không tìm thấy tài khoản" }, 404);
+        const REFS: [string, string, string][] = [
+          ["purchase_requests", "requested_by", "PR đã lập"], ["purchase_requests", "approved_by", "PR đã duyệt"],
+          ["pr_history", "changed_by", "lịch sử PR"], ["pr_deliveries", "confirmed_by", "lần nhận hàng"],
+          ["pr_deliveries", "resolved_by", "xử lý giao hàng"], ["pr_attachments", "uploaded_by", "file đính kèm"],
+          ["purchase_proposals", "created_by", "đề xuất mua"], ["purchase_proposals", "handled_by", "đề xuất mua"],
+          ["stock", "updated_by", "dòng tồn kho"], ["stock_log", "changed_by", "lịch sử kho"],
+          ["materials", "created_by", "vật tư đã tạo"], ["assets", "created_by", "tài sản"], ["asset_history", "changed_by", "lịch sử tài sản"],
+        ];
+        const used = new Set<string>();
+        for (const [t, c, label] of REFS) {
+          const { count, error } = await admin.from(t).select("*", { count: "exact", head: true }).eq(c, id);
+          if (error) return json({ error: error.message }, 500);
+          if (count) used.add(label);
+        }
+        if (used.size) return json({ error: `Tài khoản đã có dữ liệu (${[...used].join(", ")}) nên không xoá được — hãy bỏ dấu "Đang dùng" để khoá tài khoản.` }, 400);
+        await audit("user_delete", id, p.email ?? "", p);
+        const { error } = await admin.auth.admin.deleteUser(id); // profile tự xoá theo (on delete cascade)
+        if (error) return json({ error: error.message }, 400);
         return json({ ok: true });
       }
 

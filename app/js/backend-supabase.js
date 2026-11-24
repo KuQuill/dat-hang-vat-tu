@@ -103,6 +103,8 @@ export function SupaBackend() {
                                       p_receiver_name: p.receiver_name || null, p_receiver_phone: p.receiver_phone || null }),
     upsertWorkCategory: w => rpc('upsert_work_category', { p_code: w.code, p_name: w.name, p_sort: w.sort ?? 100, p_active: w.active !== false }),
     recallPR: (pr, reason) => rpc('recall_pr', { p_pr: pr, p_reason: reason || null }),
+    deleteSite: id => rpc('delete_site', { p_id: id }),
+    deleteWorkCategory: code => rpc('delete_work_category', { p_code: code }),
     upsertSite: s => rpc('upsert_site', { p_id: s.id || null, p_code: s.code, p_name: s.name, p_address: s.address || null, p_manager: s.manager || null, p_active: s.active !== false, p_is_workshop: !!s.is_workshop }),
     addAttachments: (pr, files) => rpc('add_attachments', { p_pr: pr, p_files: files }),
     approvePR: (pr, ok, reason) => rpc('approve_pr', { p_pr: pr, p_ok: ok, p_reason: reason || null }),

@@ -14,7 +14,7 @@ dat-hang-vat-tu/
 │       ├── main.js                    # khởi động, đăng nhập, đồng bộ
 │       └── views-*.js                 # các màn hình
 ├── supabase/migrations/001_init.sql   # bảng, phân quyền, kho ảnh, hàm
-├── supabase/functions/admin-users/    # Edge Function: quản trị tạo/khoá tài khoản
+├── supabase/functions/admin-users/    # Edge Function: quản trị tạo/khoá/xoá tài khoản
 └── docs/LENH_BOT.md                   # lệnh bot Telegram (giai đoạn sau)
 ```
 
@@ -52,8 +52,8 @@ Phòng vật tư chuyển đợt sang "Đang giao" ──► Công trường b�
 | **3. Theo dõi & nhận hàng** | Mọi người | Toàn bộ PR. **Quản lý duyệt**; phòng vật tư chia đợt, chọn nguồn kho / mua, NCC, PO, ngày về. Công trường **xác nhận nhận hàng** từng đợt |
 | **4. Kho & tài sản** | Mọi người xem · phòng vật tư sửa | **Vật tư theo số lượng** (vị trí, tình trạng, ảnh, tồn tối thiểu, đang giữ cho PR) · **Tài sản từng chiếc** (mã tài sản, biển số, vị trí, tình trạng, lịch sử, **tem QR**) · **Nhóm vật tư** |
 | **5. Đề xuất mua** | Phòng vật tư | Danh sách cần mua → lập đề xuất → cập nhật trạng thái, NCC, đơn giá, ngày về, PO |
-| **Dự án** | Quản lý · Quản trị | Khai báo dự án, hạng mục thi công |
-| **6. Tài khoản** | Quản trị | Tạo tài khoản, đổi quyền, gán công trường, khoá, đặt lại mật khẩu |
+| **Dự án** | Quản lý · Quản trị | Khai báo dự án, hạng mục thi công; xoá dự án / hạng mục chưa có PR |
+| **6. Tài khoản** | Quản trị | Tạo tài khoản, đổi quyền, gán công trường, khoá, đặt lại mật khẩu, xoá tài khoản chưa có dữ liệu |
 | **7. Nhật ký** | Quản trị | Mọi lần thêm / sửa / xoá dữ liệu, đăng nhập, thao tác tài khoản: ai, lúc nào, trường nào đổi từ gì sang gì. Lọc theo nhóm, người, ngày, mã; xuất CSV. Không ai sửa / xoá được nhật ký |
 
 ### Số PR & thu hồi / sửa PR
@@ -76,7 +76,7 @@ Phòng vật tư chuyển đợt sang "Đang giao" ──► Công trường b�
 Ở màn hình Theo dõi (hoặc ngay sau khi gửi PR) bấm **⬇ Xuất PDF** → tải file `SỐ-PR.pdf`: phiếu đề nghị cấp vật tư A4 gồm thông tin PR, bảng vật tư và 2 ô ký (Người đặt hàng · Chỉ huy trưởng) để ký và gửi lên nhóm.
 
 ### Dự án / công trường
-Màn hình **Dự án** (quản lý, quản trị): thêm / sửa **mã dự án**, tên dự án, địa chỉ, chỉ huy trưởng, ngừng dự án.
+Màn hình **Dự án** (quản lý, quản trị): thêm / sửa **mã dự án**, tên dự án, địa chỉ, chỉ huy trưởng, ngừng dự án. Dự án / hạng mục chưa có PR (và không còn tồn kho, tài sản) thì xoá được bằng nút 🗑; đã có PR thì chỉ chuyển "Ngừng" / "Ẩn".
 Mã dự án đã có PR thì không đổi được (vì nằm trong số PR).
 
 ### Nhập tài khoản hàng loạt (CSV)
@@ -113,7 +113,7 @@ Phòng vật tư thêm nhóm / nhóm con trong *Kho & tài sản → 🗂 Nhóm 
 ## Bước 1 — Tạo Supabase
 
 1. https://supabase.com → **New project** → Region **Southeast Asia (Singapore)**.
-2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql`, `004_roles_manager.sql`, `005_workshop_alloc.sql`, `006_audit_log.sql` (thư mục `supabase/migrations/`).
+2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql`, `004_roles_manager.sql`, `005_workshop_alloc.sql`, `006_audit_log.sql`, `007_delete_site_category.sql` (thư mục `supabase/migrations/`).
 3. Thêm công trường:
    ```sql
    insert into public.sites (code, name, address, manager) values
