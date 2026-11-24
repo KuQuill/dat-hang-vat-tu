@@ -149,7 +149,7 @@ npx supabase functions deploy admin-users
 ## Bước 3 — Nhập dữ liệu ban đầu
 
 Đăng nhập phòng vật tư → **Kho & tài sản**:
-- **Vật tư**: *📋 Nhập từ Excel* (bấm *⬇ File mẫu* để lấy mẫu cột). Chọn *Kiểm kê*.
+- **Vật tư**: *📋 Nhập từ Excel* → chọn thẳng file Excel kho đang có (.xlsx). Hệ thống tự nhận cột (Mã, Tên, Quy cách, ĐVT, Số lượng, Vị trí…) theo dòng tiêu đề, cho chỉnh lại và xem trước; **ảnh vật tư chèn trong file** (ảnh đặt trong ô hoặc Insert → Picture → Place in Cell) được gắn theo dòng. Dòng không có số lượng (tiêu đề nhóm, tổng cộng) tự bỏ qua. *⬇ File mẫu* tải mẫu .xlsx có hướng dẫn. Chọn *Kiểm kê*.
 - **Tài sản**: *📋 Nhập từ Excel*, mỗi dòng một chiếc (mã loại, tên, biển số, vị trí, tình trạng).
 
 Nếu muốn giữ **mã cũ**: nhập danh mục vào bảng `materials` trước (Table Editor → Import CSV), rồi đồng bộ bộ đếm:

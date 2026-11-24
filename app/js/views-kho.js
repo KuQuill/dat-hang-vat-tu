@@ -182,17 +182,87 @@ async function stockDeclare(mid) {
   }, 'Đã khai báo tồn');
 }
 const STOCK_COLS = 'Mã VT · Tên vật tư · Quy cách · ĐVT · Nhóm · Số lượng · Vị trí (Kho tổng / mã dự án) · Vị trí chi tiết · Tình trạng';
+// Trường nhập tồn + các tên cột thường gặp trong file kho (đã bỏ dấu, chữ thường)
+const SF = [
+  ['code', 'Mã VT', ['ma vt', 'ma vat tu', 'ma hang', 'ma hang hoa', 'ma so', 'ma', 'code', 'ma sp', 'ma vat lieu']],
+  ['name', 'Tên vật tư', ['ten vat tu', 'ten hang', 'ten hang hoa', 'ten', 'vat tu', 'ten vat lieu', 'dien giai', 'mo ta', 'ten san pham', 'noi dung']],
+  ['spec', 'Quy cách', ['quy cach', 'thong so', 'thong so ky thuat', 'kich thuoc', 'model', 'chung loai', 'dac tinh', 'quy cach ky thuat']],
+  ['unit', 'ĐVT', ['dvt', 'don vi', 'don vi tinh', 'dv', 'd.v.t', 'unit']],
+  ['group', 'Nhóm', ['nhom', 'nhom vat tu', 'loai', 'nhom hang']],
+  ['qty', 'Số lượng', ['so luong', 'sl', 'ton', 'ton kho', 'ton cuoi', 'ton cuoi ky', 'sl ton', 'so luong ton', 'so luong ton kho', 'khoi luong', 'qty']],
+  ['site', 'Vị trí (kho / mã dự án)', ['vi tri', 'kho', 'cong trinh', 'du an', 'ma du an', 'noi de', 'ma cong trinh']],
+  ['location', 'Vị trí chi tiết', ['vi tri chi tiet', 'ke', 'ngan', 'vi tri luu kho', 'vi tri de', 'o ke']],
+  ['condition', 'Tình trạng', ['tinh trang', 'hien trang', 'chat luong']],
+  ['min_qty', 'Tồn tối thiểu', ['ton toi thieu', 'min', 'dinh muc', 'ton an toan']],
+  ['note', 'Ghi chú', ['ghi chu', 'note', 'chu thich']],
+];
+const hnorm = v => norm(String(v ?? '')).replace(/[*:()\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+const colName = i => { let s = ''; i++; while (i) { s = String.fromCharCode(65 + (i - 1) % 26) + s; i = Math.floor((i - 1) / 26); } return s; };
+function matchScore(h, syns) {
+  if (!h) return 0; let best = 0;
+  for (const s of syns) { if (h === s) return 3; if (s.length >= 2 && (h.startsWith(s + ' ') || h.endsWith(' ' + s))) best = Math.max(best, 2); else if (s.length >= 4 && h.includes(s)) best = Math.max(best, 1); }
+  return best;
+}
+function guessHeader(rows) {
+  let best = { row: -1, score: 0 };
+  for (let r = 0; r < Math.min(rows.length, 30); r++) {
+    const hs = rows[r].map(hnorm); let score = 0;
+    for (const [, , syns] of SF) if (hs.some(h => matchScore(h, syns) >= 2)) score++;
+    if (score > best.score) best = { row: r, score };
+  }
+  return best.score >= 2 ? best.row : 0;
+}
+function guessMap(header) {
+  const hs = header.map(hnorm), map = {}, used = new Set(), cand = [];
+  SF.forEach(([k, , syns]) => hs.forEach((h, c) => { const s = matchScore(h, syns); if (s) cand.push([s, k, c]); }));
+  cand.sort((a, b) => b[0] - a[0] || a[2] - b[2]);
+  for (const [, k, c] of cand) if (!(k in map) && !used.has(c)) { map[k] = c; used.add(c); }
+  return map;
+}
+const cellStr = v => v === '' || v == null ? '' : String(v).trim();
+const qtyVal = v => typeof v === 'number' ? v : parseNum(v);
+// Từ sheet + cách ghép cột → các dòng nhập tồn (kèm số dòng Excel và ảnh)
+function buildRows(sheet, hdr, map, defSite, defCond) {
+  const out = [], skipped = [];
+  const g = (r, k) => map[k] >= 0 ? r[map[k]] : '';
+  for (let i = hdr + 1; i < sheet.rows.length; i++) {
+    const r = sheet.rows[i]; const name = cellStr(g(r, 'name')), code = cellStr(g(r, 'code'));
+    if (!name && !code) continue;
+    const q = qtyVal(g(r, 'qty'));
+    if (q == null || Number.isNaN(q)) { skipped.push(i + 1); continue; } // dòng tiêu đề nhóm / tổng cộng / chưa có số lượng
+    const site = cellStr(g(r, 'site'));
+    out.push({ excelRow: i + 1, img: sheet.images.get(i) || null,
+      code, name, spec: cellStr(g(r, 'spec')), unit: cellStr(g(r, 'unit')), group: cellStr(g(r, 'group')), qty: q,
+      site: site && !/^kho tong$/.test(norm(site)) ? site : (defSite === 'kho' ? '' : defSite),
+      location: cellStr(g(r, 'location')), condition: cellStr(g(r, 'condition')) || defCond,
+      min_qty: map.min_qty >= 0 && cellStr(g(r, 'min_qty')) !== '' ? qtyVal(g(r, 'min_qty')) : null, note: cellStr(g(r, 'note')) });
+  }
+  return { rows: out, skipped };
+}
+
 async function stockImport() {
   const { action, data } = await modal({
     title: 'Nhập tồn kho từ Excel', wide: true,
-    body: `<div class="form mb"><label class="f">Kiểu nhập<select id="si-mode"><option value="set">Kiểm kê: đặt số tồn = số lượng nhập</option><option value="add">Nhập/xuất: cộng thêm (số âm = trừ)</option></select></label>
-        <label class="f">Lý do / ghi chú<input id="si-reason" placeholder="vd: Kiểm kê cuối tháng 11"></label></div>
-      <p class="muted small">Copy từ Excel các cột: <b>${STOCK_COLS}</b>. Có mã → cập nhật mã đó. Không có mã → tìm vật tư trùng tên, không có thì <b>tự cấp mã mới</b> (cần tên + ĐVT). Vị trí để trống = Kho tổng. Tình trạng: Mới / Đã qua sử dụng / Hỏng / Đang sửa.</p>
-      <textarea id="si-box" rows="12" placeholder="KC-0002\tThép thanh vằn D16\tCB400-V\ttấn\tKC\t12\tKho tổng\tBãi thép A\tMới"></textarea>`,
-    actions: [{ label: 'Huỷ', value: null }, { label: 'Nhập tồn kho', value: 'ok', primary: true, validate: v => parseStock(v.text).length ? null : 'Chưa có dòng dữ liệu nào' }],
-    read: ov => ({ mode: $('#si-mode', ov).value, reason: $('#si-reason', ov).value, text: $('#si-box', ov).value }),
+    body: `<div class="import-pick">
+        <label class="btn primary big">📂 Chọn file Excel của kho<input type="file" id="si-file" accept=".xlsx,.xlsm,.xls" hidden></label>
+        <p class="small muted">Dùng thẳng file Excel kho đang có (.xlsx). Hệ thống tự nhận các cột <b>Mã, Tên, Quy cách, ĐVT, Số lượng…</b> theo dòng tiêu đề — bạn kiểm tra lại trước khi nhập.
+        <b>Hình ảnh vật tư</b> chèn trong file (ảnh đặt trong ô, hoặc Insert → Picture → Place in Cell) được gắn theo đúng dòng.</p>
+        <p class="small"><a href="#" id="si-tpl">⬇ Tải file mẫu .xlsx</a></p></div>
+      <details class="mt"><summary class="small">Hoặc dán dữ liệu copy từ Excel (không kèm ảnh)</summary>
+        <div class="form mb mt"><label class="f">Kiểu nhập<select id="si-mode"><option value="set">Kiểm kê: đặt số tồn = số lượng nhập</option><option value="add">Nhập/xuất: cộng thêm (số âm = trừ)</option></select></label>
+          <label class="f">Lý do / ghi chú<input id="si-reason" placeholder="vd: Kiểm kê cuối tháng 11"></label></div>
+        <p class="muted small">Các cột theo thứ tự: <b>${STOCK_COLS}</b>.</p>
+        <textarea id="si-box" rows="8" placeholder="KC-0002\tThép thanh vằn D16\tCB400-V\ttấn\tKC\t12\tKho tổng\tBãi thép A\tMới"></textarea></details>`,
+    actions: [{ label: 'Huỷ', value: null }, { label: 'Nhập dữ liệu đã dán', value: 'paste', validate: v => parseStock(v.text).length ? null : 'Chưa chọn file hoặc chưa dán dòng nào' }, { label: 'file', value: 'file' }],
+    onOpen: ov => {
+      const fb = ov.querySelector('footer button[data-i="2"]'); fb.style.display = 'none';
+      $('#si-file', ov).addEventListener('change', e => { ov._file = e.target.files[0]; if (ov._file) fb.click(); });
+      $('#si-tpl', ov).addEventListener('click', e => { e.preventDefault(); stockTemplate(); });
+    },
+    read: ov => ({ file: ov._file || null, mode: $('#si-mode', ov).value, reason: $('#si-reason', ov).value, text: $('#si-box', ov).value }),
   });
-  if (action !== 'ok') return;
+  if (action === 'file' && data.file) return stockImportFile(data.file);
+  if (action !== 'paste') return;
   const rows = parseStock(data.text);
   try {
     const r = await ctx.B.setStock(rows, data.mode, data.reason);
@@ -200,13 +270,124 @@ async function stockImport() {
     importResult(r.ok, rows.length, r.created, r.errors);
   } catch (e) { toast(e.message, 'err'); }
 }
+
+async function stockImportFile(file) {
+  if (file.size > 60 * 1024 * 1024) return toast('File quá lớn (> 60MB)', 'err');
+  toast('Đang đọc file Excel…', '');
+  let wb;
+  try { const { readWorkbook } = await import('./xlsx-read.js'); wb = await readWorkbook(file); }
+  catch (e) { return toast(e.message || 'Không đọc được file Excel', 'err'); }
+  if (!wb.sheets.length) return toast('File không có dữ liệu', 'err');
+  if (wb.imgErr) toast(wb.imgErr, 'err');
+  // chọn sheet có nhiều dòng nhất làm mặc định
+  const st = { sheet: wb.sheets.reduce((a, s, i) => s.rows.length > wb.sheets[a].rows.length ? i : a, 0) };
+  const reset = () => { const sh = wb.sheets[st.sheet]; st.hdr = guessHeader(sh.rows); st.map = guessMap(sh.rows[st.hdr] || []); };
+  reset();
+  const urls = [];
+  const fieldSel = (k, header) => `<select data-map="${k}"><option value="-1">— Không có —</option>${header.map((h, c) => `<option value="${c}" ${st.map[k] === c ? 'selected' : ''}>${colName(c)}${cellStr(h) ? ' · ' + esc(cellStr(h).slice(0, 40)) : ''}</option>`).join('')}</select>`;
+  const render = ov => {
+    const sh = wb.sheets[st.sheet], header = sh.rows[st.hdr] || [];
+    const width = Math.max(header.length, ...sh.rows.slice(st.hdr, st.hdr + 50).map(r => r.length));
+    const hdrFull = Array.from({ length: width }, (_, c) => header[c] ?? '');
+    $('#sx-map', ov).innerHTML = SF.map(([k, l]) => `<label class="f">${['name', 'unit', 'qty'].includes(k) ? `<span class="req">${l}</span>` : l}${fieldSel(k, hdrFull)}</label>`).join('');
+    preview(ov);
+  };
+  const preview = ov => {
+    urls.splice(0).forEach(u => URL.revokeObjectURL(u));
+    const sh = wb.sheets[st.sheet];
+    const { rows, skipped } = buildRows(sh, st.hdr, st.map, $('#sx-site', ov).value, $('#sx-cond', ov).value);
+    const nImg = rows.filter(r => r.img).length;
+    const miss = ['name', 'qty'].filter(k => !(st.map[k] >= 0)).map(k => SF.find(f => f[0] === k)[1]);
+    ov._rows = rows;
+    $('#sx-sum', ov).innerHTML = miss.length ? `<span class="late-text">Chưa chọn cột: ${miss.join(', ')}</span>`
+      : `<b>${rows.length}</b> dòng sẽ nhập · <b>${nImg}</b> dòng có ảnh${skipped.length ? ` · bỏ qua ${skipped.length} dòng không có số lượng (dòng ${skipped.slice(0, 8).join(', ')}${skipped.length > 8 ? '…' : ''})` : ''}`;
+    const show = rows.slice(0, 12);
+    $('#sx-prev', ov).innerHTML = show.length ? `<div class="table-wrap"><table class="import-prev"><thead><tr><th>Dòng</th><th>Ảnh</th><th>Mã</th><th>Tên vật tư</th><th>Quy cách</th><th>ĐVT</th><th class="num">SL</th><th>Vị trí</th><th>Tình trạng</th></tr></thead>
+      <tbody>${show.map(r => { let im = ''; if (r.img) { const u = URL.createObjectURL(r.img); urls.push(u); im = `<img src="${u}" alt="" class="sthumb">`; }
+        return `<tr><td class="small muted">${r.excelRow}</td><td>${im}</td><td class="mono">${esc(r.code)}</td><td>${esc(r.name)}</td><td class="small">${esc(r.spec)}</td><td>${esc(r.unit)}</td><td class="num">${fmtN(r.qty)}</td><td class="small">${esc(r.site || 'Kho tổng')}${r.location ? ' · ' + esc(r.location) : ''}</td><td class="small">${esc((COND[r.condition] || [r.condition])[0])}</td></tr>`; }).join('')}</tbody></table></div>
+      ${rows.length > show.length ? `<p class="small muted">… và ${rows.length - show.length} dòng nữa</p>` : ''}` : '<p class="muted">Không có dòng dữ liệu nào — kiểm tra lại dòng tiêu đề và cột Tên / Số lượng.</p>';
+  };
+  const { action, data } = await modal({
+    title: `Nhập tồn kho — ${file.name}`, wide: true,
+    body: `<div class="form mb">
+        ${wb.sheets.length > 1 ? `<label class="f">Sheet<select id="sx-sheet">${wb.sheets.map((s, i) => `<option value="${i}" ${i === st.sheet ? 'selected' : ''}>${esc(s.name)} (${s.rows.length} dòng)</option>`).join('')}</select></label>` : ''}
+        <label class="f">Dòng tiêu đề (số dòng trong Excel)<input id="sx-hdr" type="number" min="1" value="${st.hdr + 1}"></label>
+        <label class="f">Kiểu nhập<select id="sx-mode"><option value="set">Kiểm kê: đặt số tồn = số lượng nhập</option><option value="add">Nhập/xuất: cộng thêm (số âm = trừ)</option></select></label>
+        <label class="f">Lý do / ghi chú<input id="sx-reason" placeholder="vd: Kiểm kê cuối tháng 11"></label>
+        <label class="f">Vị trí khi ô trống<select id="sx-site">${locOptions('kho')}</select></label>
+        <label class="f">Tình trạng khi ô trống<select id="sx-cond">${condOptions('moi')}</select></label></div>
+      <h4 class="mb">Ghép cột trong file với thông tin vật tư</h4>
+      <div class="form mb" id="sx-map"></div>
+      <p class="small muted">Có mã → cập nhật đúng mã đó. Không có mã → tìm vật tư trùng tên, không có thì tự cấp mã mới (cần Tên + ĐVT). Ảnh nằm trên dòng nào thì gắn cho vật tư dòng đó.</p>
+      <div id="sx-sum" class="mb"></div><div id="sx-prev"></div>`,
+    onOpen: ov => {
+      render(ov);
+      ov.addEventListener('change', e => {
+        const t = e.target;
+        if (t.id === 'sx-sheet') { st.sheet = +t.value; reset(); $('#sx-hdr', ov).value = st.hdr + 1; render(ov); }
+        else if (t.id === 'sx-hdr') { st.hdr = Math.max(0, (+t.value || 1) - 1); st.map = guessMap(wb.sheets[st.sheet].rows[st.hdr] || []); render(ov); }
+        else if (t.dataset.map) { if (+t.value < 0) delete st.map[t.dataset.map]; else st.map[t.dataset.map] = +t.value; preview(ov); }
+        else if (t.id === 'sx-site' || t.id === 'sx-cond') preview(ov);
+      });
+    },
+    actions: [{ label: 'Huỷ', value: null }, { label: 'Nhập tồn kho', value: 'ok', primary: true,
+      validate: v => !(st.map.name >= 0) && !(st.map.code >= 0) ? 'Chọn cột Tên vật tư (hoặc Mã VT)' : !(st.map.qty >= 0) ? 'Chọn cột Số lượng' : !v.rows.length ? 'Không có dòng nào để nhập' : v.rows.length > 5000 ? 'Tối đa 5000 dòng mỗi lần' : null }],
+    read: ov => ({ rows: ov._rows || [], mode: $('#sx-mode', ov).value, reason: $('#sx-reason', ov).value }),
+  });
+  urls.forEach(u => URL.revokeObjectURL(u));
+  if (action !== 'ok') return;
+  const rows = data.rows;
+  try {
+    toast(`Đang ghi ${rows.length} dòng…`, '');
+    const r = await ctx.B.setStock(rows.map(({ excelRow, img, ...x }) => x), data.mode, data.reason || `Nhập từ file ${file.name}`);
+    // ids chỉ có cho các dòng thành công, theo đúng thứ tự → ghép lại với dòng
+    const bad = new Set(r.errors.map(e => e.row)); let j = 0; const jobs = [];
+    rows.forEach((row, k) => { if (bad.has(k + 1)) return; const id = r.ids[j++]; if (row.img && id) jobs.push([id, row]); });
+    let imgOk = 0; const imgErr = [];
+    for (let k = 0; k < jobs.length; k++) {
+      const [id, row] = jobs[k];
+      if (k % 5 === 0) toast(`Đang tải ảnh ${k + 1}/${jobs.length}…`, '');
+      try { await ctx.B.updateStock(id, { image_path: await ctx.B.uploadImage(await compressImage(row.img, 1200, 0.8)) }); imgOk++; }
+      catch (e) { imgErr.push({ row: row.excelRow, error: 'Ảnh: ' + e.message }); }
+    }
+    await hooks.pull().catch(() => {}); renderStock();
+    importResult(r.ok, rows.length, r.created, [...r.errors.map(e => ({ row: rows[e.row - 1] ? rows[e.row - 1].excelRow : e.row, error: e.error })), ...imgErr], jobs.length ? `🖼 Đã gắn ${imgOk}/${jobs.length} ảnh vật tư.` : '');
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function stockTemplate() {
+  try {
+    const { loadXlsxLibs } = await import('./xlsx-read.js'); await loadXlsxLibs();
+    const X = window.XLSX;
+    const head = ['Mã VT', 'Tên vật tư', 'Quy cách', 'ĐVT', 'Nhóm', 'Số lượng', 'Vị trí (Kho tổng / mã dự án)', 'Vị trí chi tiết', 'Tình trạng', 'Tồn tối thiểu', 'Ghi chú', 'Hình ảnh'];
+    const ws = X.utils.aoa_to_sheet([head,
+      ['KC-0002', 'Thép thanh vằn D16', 'CB400-V', 'tấn', 'KC', 12, 'Kho tổng', 'Bãi thép A', 'Mới', 2, '', '(dán ảnh vào ô này)'],
+      ['', 'Giàn giáo khung 1.7m', '', 'bộ', 'DC', 80, 'LA01', '', 'Đã qua sử dụng', '', '', '(dán ảnh vào ô này)']]);
+    ws['!cols'] = [10, 32, 18, 8, 8, 10, 26, 18, 16, 12, 24, 22].map(wch => ({ wch }));
+    ws['!rows'] = [{ hpx: 22 }, ...Array.from({ length: 200 }, () => ({ hpx: 60 }))];
+    const guide = X.utils.aoa_to_sheet([
+      ['HƯỚNG DẪN NHẬP TỒN KHO'], [''],
+      ['1. Có thể dùng luôn file Excel kho đang có, không bắt buộc theo mẫu này. Khi nhập, hệ thống tự nhận cột theo dòng tiêu đề và cho chỉnh lại.'],
+      ['2. Bắt buộc: Tên vật tư (hoặc Mã VT đã có), ĐVT (khi tạo mã mới), Số lượng. Dòng không có số lượng (tiêu đề nhóm, tổng cộng) sẽ được bỏ qua.'],
+      ['3. Có Mã VT thì cập nhật đúng mã đó. Không có mã thì tìm vật tư trùng tên; không có nữa thì tự cấp mã mới.'],
+      ['4. Vị trí: để trống hoặc "Kho tổng" = kho tổng; hoặc ghi mã dự án (vd LA01).'],
+      ['5. Tình trạng: Mới / Đã qua sử dụng / Hỏng / Đang sửa.'],
+      ['6. Hình ảnh: bấm vào ô cột Hình ảnh của dòng → Insert (Chèn) → Pictures (Ảnh) → Place in Cell (Đặt trong ô); hoặc chèn ảnh rồi kéo cho nằm gọn trong ô của dòng đó. Mỗi dòng 1 ảnh.'],
+      ['7. Lưu file dạng .xlsx (file Excel 97-2003 .xls không đọc được ảnh).'],
+    ]);
+    guide['!cols'] = [{ wch: 130 }];
+    const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'Ton kho'); X.utils.book_append_sheet(wb, guide, 'Huong dan');
+    X.writeFile(wb, 'mau-nhap-ton-kho.xlsx');
+  } catch (e) { toast(e.message, 'err'); }
+}
+
 function parseStock(text) {
   const lines = parsePaste(text);
   if (lines.length && /^ma/.test(norm(lines[0][0])) && Number.isNaN(parseNum(lines[0][5]))) lines.shift();
   return lines.map(c => ({ code: c[0] || '', name: c[1] || '', spec: c[2] || '', unit: c[3] || '', group: c[4] || '', qty: c[5] ?? '', site: c[6] || '', location: c[7] || '', condition: c[8] || '' }));
 }
-function importResult(ok, total, created, errors) {
-  return modal({ title: 'Kết quả nhập', body: `<p>Đã ghi <b>${ok}</b>/${total} dòng.</p>
+function importResult(ok, total, created, errors, extra = '') {
+  return modal({ title: 'Kết quả nhập', body: `<p>Đã ghi <b>${ok}</b>/${total} dòng.</p>${extra ? `<p>${esc(extra)}</p>` : ''}
     ${created.length ? `<p>🆕 Tạo mới ${created.length} mã: <span class="mono">${created.map(esc).join(', ')}</span></p>` : ''}
     ${errors.length ? `<p class="late-text">Lỗi ${errors.length} dòng (đã bỏ qua):</p><ul>${errors.map(e => `<li>Dòng ${e.row}: ${esc(e.error)}</li>`).join('')}</ul>` : ''}`,
     actions: [{ label: 'Đóng', value: 'ok', primary: true }] });
@@ -466,7 +647,7 @@ Object.assign(ACT, {
   'stock-img': async b => { const img = await pickOneImage(); if (img) runAction(async () => ctx.B.updateStock(b.dataset.id, { image_path: await ctx.B.uploadImage(img) }), 'Đã cập nhật ảnh'); },
   'stock-new': () => stockNew(),
   'stock-import': () => stockImport(),
-  'stock-template': () => downloadText('﻿' + [STOCK_COLS.split(' · ').join(','), 'KC-0002,Thép thanh vằn D16,CB400-V,tấn,KC,12,Kho tổng,Bãi thép A,Mới', ',Giàn giáo khung 1.7m,,bộ,DC,80,LA01,,Đã qua sử dụng'].join('\r\n'), 'mau-nhap-ton-kho.csv', 'text/csv;charset=utf-8'),
+  'stock-template': () => stockTemplate(),
   'stock-export': () => exportRows(stockRows().filter(x => x.s).map(({ s, m }) => ({ 'Mã VT': m.code, 'Tên vật tư': m.name, 'Quy cách': m.spec || '', 'ĐVT': m.unit, 'Nhóm': groupName(m.group_code),
     'Vị trí': locLabel(s.site_id), 'Vị trí chi tiết': s.location_detail || '', 'Tình trạng': COND[s.condition][0], 'Số lượng tồn': Number(s.qty),
     'Đang giữ cho PR': round6(D().openKhoByStock.get(s.id) || 0), 'Cập nhật': fmtDT(s.updated_at) })), `ton-kho-${todayISO()}`, 'Tồn kho'),
