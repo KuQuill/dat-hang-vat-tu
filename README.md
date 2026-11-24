@@ -98,6 +98,13 @@ Phòng vật tư thêm nhóm / nhóm con trong *Kho & tài sản → 🗂 Nhóm 
 
 ---
 
+### Tiếng Việt / English
+- Nút **🌐 EN / 🌐 VI** ở góc trên (và ở trang đăng nhập) chuyển giao diện; lựa chọn lưu trên từng máy.
+- Chữ giao diện dịch theo từ điển `app/js/i18n-en.js` (thêm câu mới vào đây khi sửa giao diện). Phiếu PDF và file xuất Excel/CSV giữ tiếng Việt.
+- Tên vật tư, quy cách, nhóm, nhóm con, hạng mục: lưu ở cột `name_en` / `spec_en`. Tên mới khai báo tiếng Việt được trình duyệt **tự dịch** bằng dịch vụ miễn phí MyMemory (tối đa 25 tên mỗi lần cập nhật, hạn mức ~5.000 ký tự/ngày cho mỗi máy) rồi lưu chung cho mọi người. Đổi tên tiếng Việt → bản dịch tự xoá để dịch lại.
+- Phòng vật tư / Quản trị sửa bản dịch chưa chuẩn ở **Kho & tài sản → 🌐 Tên tiếng Anh**. Ô tìm vật tư nhận cả tên tiếng Anh.
+- Tên dự án, tên người, tiêu đề PR, ghi chú… là dữ liệu tự do, giữ nguyên như người dùng nhập.
+
 ## Trạng thái hiện tại
 
 - 🌐 **Web app**: https://vattu.mekongdecor.com/ (GitHub Pages, tên miền riêng; link cũ kuquill.github.io/dat-hang-vat-tu tự chuyển sang) — tự cập nhật mỗi khi push thay đổi trong `app/` lên nhánh `main`.
@@ -113,7 +120,7 @@ Phòng vật tư thêm nhóm / nhóm con trong *Kho & tài sản → 🗂 Nhóm 
 ## Bước 1 — Tạo Supabase
 
 1. https://supabase.com → **New project** → Region **Southeast Asia (Singapore)**.
-2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql`, `004_roles_manager.sql`, `005_workshop_alloc.sql`, `006_audit_log.sql`, `007_delete_site_category.sql` (thư mục `supabase/migrations/`).
+2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql`, `004_roles_manager.sql`, `005_workshop_alloc.sql`, `006_audit_log.sql`, `007_delete_site_category.sql`, `008_english_names.sql` (thư mục `supabase/migrations/`).
 3. Thêm công trường:
    ```sql
    insert into public.sites (code, name, address, manager) values

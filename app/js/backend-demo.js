@@ -435,6 +435,18 @@ export function DemoBackend() {
       if (x) Object.assign(x, vals); else db.workCats.push(vals);
       return null;
     }),
+    // bản dịch tiếng Anh (giống set_translations): ô trống thì ai cũng điền được; ghi đè cần Phòng vật tư / Quản trị
+    async setTranslations(items, force = false) {
+      const u = me() || fail('Bạn chưa đăng nhập');
+      if (force && !['procurement', 'admin'].includes(u.role)) fail('Bạn không có quyền thực hiện thao tác này');
+      const T = { materials: ['materials', 'id'], material_groups: ['groups', 'code'], material_subgroups: ['subgroups', 'id'], work_categories: ['workCats', 'code'] };
+      let n = 0;
+      for (const it of items || []) {
+        const t = T[it.t]; if (!t) continue; const x = db[t[0]].find(r => String(r[t[1]]) === String(it.id)); if (!x) continue;
+        for (const f of ['name_en', 'spec_en']) if (f in it && (force || !x[f])) { x[f] = String(it[f] || '').trim().slice(0, 300) || null; n++; }
+      }
+      save(); return delay(n);
+    },
     deleteWorkCategory: code => tx(() => {
       req(['manager', 'admin']);
       const i = db.workCats.findIndex(w => w.code === code); if (i < 0) fail(`Không tìm thấy hạng mục ${code}`);

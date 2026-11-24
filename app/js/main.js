@@ -10,9 +10,11 @@ import './views-sites.js';
 import './pdf.js';
 import './views-users.js';
 import './views-log.js';
+import './views-en.js';
+import { LANG, setLang, langBtn, initLang, setCatalog, autoTranslate } from './i18n.js';
 
 /* ---------- Bộ đệm & đồng bộ ---------- */
-const stripMat = m => { const { _n, _tg, _tok, _code, ...x } = m; return x; };
+const stripMat = m => { const { _n, _tg, _tok, _code, _e, ...x } = m; return x; };
 function saveCache() {
   const ok = LS.set(KEY.cache, { uid: S.user && S.user.id, sync: S.sync, lastSync: S.lastSync,
     sites: S.sites, groups: S.groups, subgroups: S.subgroups, workCats: S.workCats, materials: S.materials.map(stripMat), profiles: S.profiles, stock: S.stock, assets: S.assets,
@@ -80,6 +82,8 @@ async function doUpdate(full = false, silent = false) {
     await flushOutbox();
     await pull(full);
     if (!silent && S.user) toast('Đã cập nhật dữ liệu mới nhất', 'ok');
+    // tự dịch tên vật tư / nhóm / hạng mục mới sang tiếng Anh (chạy nền, không chặn giao diện)
+    autoTranslate(S, items => ctx.B.setTranslations(items)).then(n => { if (n) saveCache(); }).catch(() => {});
   } catch (e) {
     toast(isNet(e) ? 'Không có kết nối — đang dùng dữ liệu đã lưu trên máy' : 'Lỗi cập nhật: ' + e.message, 'err');
   } finally {
@@ -102,6 +106,7 @@ function renderChrome() {
   $('#user-chip').innerHTML = S.user ? `<span class="badge b-blue">${esc(ROLE[(S.profile || {}).role] || '…')}</span>
       <span class="nowrap uname">${esc((S.profile && S.profile.full_name) || S.user.email)}</span>
       <button class="btn sm ghost" data-act="logout" title="Đăng xuất">Đăng xuất</button>` : '';
+  if (!$('#lang-slot').firstChild) $('#lang-slot').innerHTML = langBtn();
   const tabs = tabsFor();
   if (S.user && !tabs.some(([k]) => k === S.tab)) S.tab = 'info';
   $('#tabs').innerHTML = S.user ? tabs.map(([k, l], i) => `<button class="tab" role="tab" data-act="tab" data-tab="${k}" aria-selected="${S.tab === k}"><span class="num">${i + 1}</span>${l}</button>`).join('') : '';
@@ -113,6 +118,7 @@ hooks.renderChrome = renderChrome;
 function render() {
   document.dispatchEvent(new Event('app:before-render'));
   document.body.classList.toggle('login-page', !S.user);
+  setCatalog(S);
   renderChrome();
   const v = $('#view');
   if (!S.user) { v.innerHTML = viewLogin(); return; }
@@ -122,11 +128,11 @@ function render() {
   if (view.after) view.after();
 }
 hooks.render = render;
-hooks.refresh = () => { const view = VIEWS[S.tab]; if (view && view.refresh) view.refresh(); else render(); };
+hooks.refresh = () => { setCatalog(S); const view = VIEWS[S.tab]; if (view && view.refresh) view.refresh(); else render(); };
 
 /* ---------- Đăng nhập ---------- */
 function viewLogin() {
-  return `<div class="card login">
+  return `<div class="card login"><div class="login-lang">${langBtn('btn sm')}</div>
     <div class="login-brand"><img src="icons/logo.png" alt=""><div class="co">${esc(CONFIG.COMPANY)}</div><div class="app">Hệ thống đặt hàng vật tư công trường</div></div>
     <h2>Đăng nhập</h2>
     <p class="muted small">Đăng nhập bằng <b>email và mật khẩu công ty cấp</b>. Quên mật khẩu hoặc chưa có tài khoản: liên hệ quản trị hệ thống.</p>
@@ -155,6 +161,7 @@ async function doLogin(email, pw) {
 }
 
 Object.assign(ACT, {
+  lang: () => setLang(LANG === 'en' ? 'vi' : 'en', render),
   tab: b => { S.tab = b.dataset.tab; LS.set(KEY.tab, S.tab); render(); window.scrollTo(0, 0); },
   update: (b, e) => doUpdate(e.shiftKey),
   login: () => doLogin($('#lg-email').value, $('#lg-pw').value),
@@ -207,6 +214,6 @@ window.addEventListener('offline', renderChrome);
   catch (e) { renderChrome(); $('#view').innerHTML = `<div class="card empty">${esc(e.message)}</div>`; return; }
   try { S.user = await ctx.B.session(); } catch { S.user = null; }
   if (S.user) loadCache();
-  render();
+  render(); initLang();
   if (S.user) doUpdate(false, true);
 })();

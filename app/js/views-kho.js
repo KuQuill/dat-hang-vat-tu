@@ -15,7 +15,7 @@ VIEWS.kho = {
         <button class="subtab" data-act="kho-tab" data-k="stock" aria-selected="${S.khoTab === 'stock'}">📦 Vật tư (theo số lượng)</button>
         <button class="subtab" data-act="kho-tab" data-k="assets" aria-selected="${S.khoTab === 'assets'}">🚜 Tài sản – thiết bị (từng chiếc)</button>
         <span class="spacer"></span>
-        ${isStaff() ? '<button class="btn sm" data-act="groups">🗂 Nhóm vật tư</button>' : ''}
+        ${isStaff() ? '<button class="btn sm" data-act="groups">🗂 Nhóm vật tư</button> <button class="btn sm" data-act="en-names">🌐 Tên tiếng Anh</button>' : ''}
       </div>
       <div id="kho-body">${S.khoTab === 'assets' ? assetsShell() : stockShell()}</div>`;
   },

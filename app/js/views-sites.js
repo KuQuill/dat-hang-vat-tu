@@ -26,7 +26,7 @@ function renderSites() {
   const count = id => S.prs.filter(p => p.site_id === id).length;
   const people = id => S.profiles.filter(p => p.site_id === id && p.active !== false).length;
   $('#sites-table').innerHTML = list.length ? `<div class="table-wrap"><table class="sites-table">
-    <thead><tr><th>Mã dự án</th><th>Tên dự án</th><th>Địa chỉ</th><th>Chỉ huy trưởng</th><th class="right">Số PR</th><th class="right">Nhân sự</th><th>Trạng thái</th><th></th></tr></thead>
+    <thead><tr><th>Mã dự án</th><th>Tên dự án</th><th>Địa chỉ</th><th>Chỉ huy trưởng</th><th class="right">SL PR</th><th class="right">Nhân sự</th><th>Trạng thái</th><th></th></tr></thead>
     <tbody>${list.map(s => `<tr class="${s.active === false ? 'muted-row' : ''}">
       <td class="mono"><b>${esc(s.code)}</b></td><td>${esc(s.name)}${s.is_workshop ? ' <span class="badge b-violet">🏭 Xưởng</span>' : ''}</td><td class="small">${esc(s.address || '')}</td><td>${esc(s.manager || '')}</td>
       <td class="right">${count(s.id)}</td><td class="right">${people(s.id)}</td>
@@ -56,7 +56,7 @@ async function siteDialog(s) {
 function renderWC() {
   const list = [...(S.workCats || [])].sort((a, b) => (b.active !== false) - (a.active !== false) || a.sort - b.sort || a.code.localeCompare(b.code));
   const used = c => S.prs.filter(p => p.category === c).length;
-  $('#wc-table').innerHTML = `<div class="table-wrap"><table class="sites-table"><thead><tr><th>Mã</th><th>Tên hạng mục thi công</th><th class="right">Thứ tự</th><th class="right">Số PR</th><th>Trạng thái</th><th></th></tr></thead>
+  $('#wc-table').innerHTML = `<div class="table-wrap"><table class="sites-table"><thead><tr><th>Mã</th><th>Tên hạng mục thi công</th><th class="right">Thứ tự</th><th class="right">SL PR</th><th>Trạng thái</th><th></th></tr></thead>
     <tbody>${list.map(w => `<tr class="${w.active === false ? 'muted-row' : ''}"><td class="mono"><b>${esc(w.code)}</b></td><td>${esc(w.name)}</td><td class="right">${w.sort}</td><td class="right">${used(w.code)}</td>
       <td>${w.active === false ? '<span class="badge b-gray">Ẩn</span>' : '<span class="badge b-green">Đang dùng</span>'}</td>
       <td class="nowrap"><button class="btn sm" data-act="wc-edit" data-code="${esc(w.code)}">✏ Sửa</button>${used(w.code) ? '' : ` <button class="btn sm danger" data-act="wc-del" data-code="${esc(w.code)}" title="Xoá hạng mục">🗑</button>`}</td></tr>`).join('')}</tbody></table></div>`;

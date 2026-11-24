@@ -1,4 +1,5 @@
 // Sheet 1 (Thông tin) và Sheet 2 (Đặt hàng)
+import { tr } from './i18n.js';
 import { S, ctx, ACT, VIEWS, INPUTS, KEY, LS, IDB, DEMO, CONFIG, hooks, $, $$, esc, norm, uid, todayISO, fmtD, fmtDT, fmtN, parseNum, isNet, debounce,
          toast, modal, confirmBox, ROLE, siteByCode, siteById, siteOptions, groupOptions, matchMaterials, MATCH, khoFree, kindOf, D,
          filesToImages, pickFiles, uploadImages, MAX_IMG_PER_PR, parsePaste, canOrder, allocText, allocSum, allocCode, parseAllocText } from './core.js';
@@ -53,7 +54,7 @@ VIEWS.info = {
         <div class="form">
           <label class="f">Họ tên<input id="pf-name" value="${esc(p.full_name)}"></label>
           <label class="f">Email đăng nhập<input value="${esc(p.email || S.user.email)}" readonly></label>
-          <label class="f">Quyền<input value="${esc(ROLE[p.role] || '')}" readonly></label>
+          <label class="f">Quyền<input value="${esc(tr(ROLE[p.role] || ''))}" readonly></label>
           <label class="f full">Dự án / công trường của tôi<select id="pf-site">${siteOptions(p.site_id ? (siteById(p.site_id) || {}).code : '')}</select></label>
         </div>
         <p class="small muted">Người cùng công trường được xác nhận nhận hàng thay cho nhau.</p>

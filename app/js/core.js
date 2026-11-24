@@ -1,5 +1,6 @@
 // Lõi dùng chung: trạng thái, tiện ích, hộp thoại, so khớp vật tư, số liệu suy ra
 import { CONFIG } from './config.js';
+import { LANG } from './i18n.js';
 export { CONFIG };
 
 export const DEMO = !CONFIG.SUPABASE_URL || !CONFIG.SUPABASE_ANON_KEY;
@@ -45,7 +46,7 @@ export const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.s
 export const vnDate = ts => ts ? new Date(ts).toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }) : '';
 export const fmtD = iso => iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '';
 export const fmtDT = ts => ts ? new Date(ts).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
-export const fmtN = n => (n == null || n === '') ? '' : Number(n).toLocaleString('vi-VN', { maximumFractionDigits: 3 });
+export const fmtN = n => (n == null || n === '') ? '' : Number(n).toLocaleString(LANG === 'en' ? 'en-US' : 'vi-VN', { maximumFractionDigits: 3 });
 export const numInput = n => (n == null || n === '') ? '' : String(Number(n));
 export const parseNum = v => { const s = String(v ?? '').trim().replace(/\s/g, '').replace(',', '.'); if (!s) return null; const n = Number(s); return Number.isFinite(n) ? n : NaN; };
 export const round6 = x => Math.round(x * 1e6) / 1e6;
@@ -207,7 +208,11 @@ function trigrams(n) {
   for (const w of n.split(/[^a-z0-9]+/).filter(Boolean)) { const p = '  ' + w + ' '; for (let i = 0; i < p.length - 2; i++) set.add(p.slice(i, i + 3)); }
   return set;
 }
-function prepMat(m) { const n = norm(m.name + ' ' + (m.spec || '')); m._n = n; m._tg = trigrams(n); m._tok = n.split(/[^a-z0-9.,]+/).filter(Boolean); m._code = m.code.toLowerCase(); }
+function prepMat(m) {
+  const n = norm(m.name + ' ' + (m.spec || '')); m._n = n; m._tg = trigrams(n); m._tok = n.split(/[^a-z0-9.,]+/).filter(Boolean); m._code = m.code.toLowerCase();
+  // tên tiếng Anh: tìm được cả khi gõ tiếng Anh
+  if (m.name_en) { const e = norm(m.name_en + ' ' + (m.spec_en || m.spec || '')); m._e = { _n: e, _tg: trigrams(e), _tok: e.split(/[^a-z0-9.,]+/).filter(Boolean), _code: m._code }; } else m._e = null;
+}
 export function prepQuery(q) {
   const n = norm(q); const nums = n.match(/\d+(?:[.,]\d+)?/g) || [];
   return { raw: String(q).trim().toLowerCase(), n, tg: trigrams(n), tok: n.split(/[^a-z0-9.,]+/).filter(Boolean),
@@ -215,6 +220,10 @@ export function prepQuery(q) {
 }
 export function scoreMat(Q, m) {
   if (!m._n) prepMat(m);
+  if (m._e) return Math.max(scoreOne(Q, m), scoreOne(Q, m._e));
+  return scoreOne(Q, m);
+}
+function scoreOne(Q, m) {
   if (!Q.n) return 0;
   if (m._code === Q.raw) return 1;
   if (Q.raw.length >= 3 && m._code.startsWith(Q.raw)) return 0.9;
