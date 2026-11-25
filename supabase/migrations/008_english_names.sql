@@ -11,7 +11,13 @@ alter table public.work_categories add column if not exists name_en text;
 create or replace function app.trg_clear_en() returns trigger language plpgsql as $$
 begin
   if NEW.name is distinct from OLD.name and NEW.name_en is not distinct from OLD.name_en then NEW.name_en := null; end if;
-  if TG_TABLE_NAME = 'materials' and NEW.spec is distinct from OLD.spec and NEW.spec_en is not distinct from OLD.spec_en then NEW.spec_en := null; end if;
+  -- spec chỉ có ở bảng materials: đọc qua jsonb để hàm dùng chung được cho các bảng khác
+  if TG_TABLE_NAME = 'materials' then
+    if (to_jsonb(NEW) ->> 'spec') is distinct from (to_jsonb(OLD) ->> 'spec')
+       and (to_jsonb(NEW) ->> 'spec_en') is not distinct from (to_jsonb(OLD) ->> 'spec_en') then
+      NEW := jsonb_populate_record(NEW, jsonb_build_object('spec_en', null));
+    end if;
+  end if;
   return NEW;
 end $$;
 drop trigger if exists clear_en on public.materials;
