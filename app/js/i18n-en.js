@@ -363,4 +363,13 @@ export default {
   'Chưa có trong kho → cần mua mới': 'Not in catalog → needs purchase', 'Dự kiến cần mua {}': 'Expected to buy {}', 'Mua mới{}': 'New purchase{}', 'Vật tư cần mua mới': 'Materials to purchase', '{} dòng cần mua': '{} lines to purchase',
   '"Đang giữ" = đã dành cho PR đã duyệt, chưa xuất': '"Reserved" = set aside for approved PRs, not yet dispatched',
   'Dự án:': 'Project:',
+  'Tìm mã, tên, quy cách, mã phủ, vị trí…': 'Search code, name, spec, coating code, location…', 'Chỉ hết hàng': 'Out of stock only', 'Dưới tồn tối thiểu': 'Below minimum stock',
+  'Xuất báo cáo kho': 'Export stock report', 'Mọi nhóm con': 'All subgroups', 'Mọi độ dày': 'All thicknesses', 'Mọi phân loại': 'All types', 'Xếp theo: {}': 'Sort by: {}',
+  'Tăng dần': 'Ascending', 'Giảm dần': 'Descending', 'Màu theo loại:': 'Colour by type:', 'Dày': 'Thickness', 'Phân loại': 'Type', 'Mã phủ': 'Coating code', 'Độ dày': 'Thickness', 'Số lượng tồn': 'Stock quantity',
+  'Tự nhận từ tên / quy cách': 'Detected from name / spec', 'Độ dày (mm)': 'Thickness (mm)', 'Mã phủ (melamine / laminate)': 'Coating code (melamine / laminate)',
+  'Thuộc tính vật tư (dùng để lọc, báo cáo kho — áp dụng cho mã {} ở mọi vị trí). Để trống = tự nhận từ tên.': 'Material attributes (for filtering and stock reports — apply to code {} in every location). Leave blank = detected from the name.',
+  'Melamine': 'Melamine', 'Laminate': 'Laminate', 'Veneer': 'Veneer', 'Phủ men': 'Enamel coated', 'Phủ film PVC': 'PVC film coated', 'Ván thô / thường': 'Raw / plain board', 'Gỗ tự nhiên': 'Solid wood',
+  'Ván thô': 'Raw board', 'Ván chống ẩm': 'Moisture-resistant board', 'Gỗ ghép': 'Finger-jointed wood', 'Gỗ xẻ': 'Sawn timber',
+  'Melamine {} mặt': 'Melamine {} side(s)', 'Laminate {} mặt': 'Laminate {} side(s)', 'Veneer {} mặt': 'Veneer {} side(s)', 'Phủ men {} mặt': 'Enamel {} side(s)', 'Phủ film PVC {} mặt': 'PVC film {} side(s)',
+  'Không tải được thư viện Excel (kiểm tra mạng)': 'Could not load the Excel library (check your network)',
 };

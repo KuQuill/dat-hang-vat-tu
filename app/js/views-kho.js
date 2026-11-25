@@ -2,7 +2,8 @@
 import { S, ctx, ACT, VIEWS, INPUTS, CONFIG, hooks, $, $$, esc, norm, todayISO, fmtD, fmtDT, fmtN, numInput, parseNum, round6, debounce,
          toast, modal, confirmBox, runAction, COND, KIND, USABLE, OPEN_ST, badge, siteById, locLabel, profName, isStaff, D, groupName,
          stockFree, khoFree, locOptions, condOptions, groupOptions, subgroupOptions, matchMaterials, MATCH, loadVisibleImages, imgTag,
-         pickFiles, compressImage, exportRows, downloadText, parsePaste } from './core.js';
+         pickFiles, compressImage, exportRows, exportBook, downloadText, parsePaste } from './core.js';
+import { attrsOf, FAMS } from './kho-attrs.js';
 
 const locFilter = (siteId, f) => !f || (f === 'kho' ? !siteId : (siteById(siteId) || {}).code === f);
 const locCell = (siteId, detail) => `${siteId ? `<b>${esc((siteById(siteId) || {}).code || '?')}</b> <span class="small muted">${esc((siteById(siteId) || {}).name || '')}</span>` : '<b>Kho tổng</b>'}${detail ? `<div class="small muted">${esc(detail)}</div>` : ''}`;
@@ -30,21 +31,24 @@ function stockShell() {
   const f = S.sfilters; const staff = isStaff();
   return `<div id="stock-kpis"></div>
     <div class="filters f4">
-      <input data-sfilter="q" value="${esc(f.q)}" placeholder="🔍 Tìm mã, tên, quy cách, vị trí…">
-      <select data-sfilter="group">${groupOptions(f.group, 'Tất cả nhóm', 'so_luong')}</select>
+      <input data-sfilter="q" value="${esc(f.q)}" placeholder="🔍 Tìm mã, tên, quy cách, mã phủ, vị trí…">
       <select data-sfilter="loc">${locOptions(f.loc, true)}</select>
       <select data-sfilter="cond">${condOptions(f.cond, 'Mọi tình trạng')}</select>
       <div class="checks">
         <label><input type="checkbox" data-sfilter="has" ${f.has ? 'checked' : ''}> Chỉ dòng có tồn</label>
+        <label><input type="checkbox" data-sfilter="out" ${f.out ? 'checked' : ''}> Chỉ hết hàng</label>
+        <label><input type="checkbox" data-sfilter="low" ${f.low ? 'checked' : ''}> Dưới tồn tối thiểu</label>
         <span class="spacer"></span>
         ${staff ? `<button class="btn sm" data-act="stock-new">＋ Vật tư mới</button><button class="btn sm" data-act="stock-import">📋 Nhập từ Excel</button><button class="btn sm" data-act="stock-template">⬇ File mẫu</button>` : ''}
-        <button class="btn sm" data-act="stock-export">⬇ Xuất Excel</button>
+        <button class="btn sm primary" data-act="stock-export">⬇ Xuất báo cáo kho</button>
       </div>
     </div>
+    <div id="stock-chips"></div>
+    <div id="stock-f2" class="filters f2row"></div>
     ${staff ? '' : '<p class="small muted mb-s">Chỉ phòng vật tư / quản trị được cập nhật tồn kho.</p>'}
     <div id="stock-table"></div>`;
 }
-function stockRows() {
+function stockBase() {
   const f = S.sfilters, q = norm(f.q), dd = D();
   const rows = S.stock.map(s => ({ s, m: dd.mat.get(s.material_id) })).filter(x => x.m);
   if (!f.has && (!f.loc || f.loc === 'kho')) {
@@ -53,14 +57,56 @@ function stockRows() {
   }
   return rows.filter(({ s, m }) => {
     if ((dd.grp.get(m.group_code) || {}).kind === 'tung_cai') return false;
-    if (f.group && m.group_code !== f.group) return false;
     if (s && !locFilter(s.site_id, f.loc)) return false;
     if (f.cond && (!s || s.condition !== f.cond)) return false;
     if (f.has && !(s && Number(s.qty) > 0)) return false;
     if (f.low && !(s && !s.site_id && s.min_qty != null && Number(s.qty) < Number(s.min_qty))) return false;
-    if (q) { const hay = norm([m.code, m.name, m.spec, s && s.location_detail, s && locLabel(s.site_id)].join(' ')); if (!q.split(' ').every(w => hay.includes(w))) return false; }
+    if (f.out && s && Number(s.qty) > 0) return false;
+    if (q) { const a = attrsOf(m); const hay = norm([m.code, m.name, m.spec, m.name_en, a.coat, a.kind, s && s.location_detail, s && locLabel(s.site_id)].join(' ')); if (!q.split(' ').every(w => hay.includes(w))) return false; }
     return true;
-  }).sort((a, b) => a.m.code.localeCompare(b.m.code) || (a.s && a.s.site_id ? 1 : 0) - (b.s && b.s.site_id ? 1 : 0));
+  });
+}
+// Lọc theo nhóm / nhóm con / độ dày / phân loại / họ vật liệu
+const passGroup = ({ m }, f) => (!f.group || m.group_code === f.group) && (!f.sub || m.subgroup_id === f.sub);
+const passAttr = ({ m }, f) => { const a = attrsOf(m); return (!f.thk || a.thk === f.thk) && (!f.kind || a.kind === f.kind) && (!f.fam || a.fam === f.fam); };
+const SORTS = [['code', 'Mã vật tư'], ['name', 'Tên vật tư'], ['group', 'Nhóm'], ['thk', 'Độ dày'], ['kind', 'Phân loại'], ['coat', 'Mã phủ'], ['qty', 'Số lượng tồn'], ['loc', 'Vị trí'], ['updated', 'Cập nhật']];
+function sortVal({ s, m }, k) {
+  const a = attrsOf(m);
+  switch (k) {
+    case 'name': return norm(m.name); case 'group': return groupName(m.group_code) + ' ' + norm(m.name);
+    case 'thk': return parseFloat(a.thk) || (a.thk ? 0 : 1e9); case 'kind': return a.kind || '~'; case 'coat': return a.coat || '~';
+    case 'qty': return s ? Number(s.qty) : 0; case 'loc': return s ? locLabel(s.site_id) + ' ' + (s.location_detail || '') : '';
+    case 'updated': return s ? s.updated_at || '' : ''; default: return m.code;
+  }
+}
+function stockRows() {
+  const f = S.sfilters;
+  const list = stockBase().filter(x => passGroup(x, f) && passAttr(x, f));
+  const k = f.sort || 'code', dir = f.dir || 1;
+  return list.map(x => [sortVal(x, k), x]).sort(([va, a], [vb, b]) => (va < vb ? -1 : va > vb ? 1 : 0) * dir
+    || a.m.code.localeCompare(b.m.code) || (a.s && a.s.site_id ? 1 : 0) - (b.s && b.s.site_id ? 1 : 0)).map(([, x]) => x);
+}
+// Chip nhóm + chip màu theo loại vật liệu + dòng lọc thứ hai (tuỳ dữ liệu hiện có)
+function renderStockFilters() {
+  const f = S.sfilters, dd = D(), base = stockBase();
+  const gcount = new Map(); for (const x of base) gcount.set(x.m.group_code, (gcount.get(x.m.group_code) || 0) + 1);
+  const groups = S.groups.filter(g => g.kind !== 'tung_cai' && (gcount.get(g.code) || f.group === g.code));
+  const inGroup = base.filter(x => passGroup(x, f));
+  const fcount = new Map(); for (const x of inGroup) { const a = attrsOf(x.m); if (a.fam) fcount.set(a.fam, (fcount.get(a.fam) || 0) + 1); }
+  const chip = (act, val, on, label, n, style = '') => `<button class="chip-f ${on ? 'on' : ''}" data-act="${act}" data-v="${esc(val)}" ${style}>${esc(label)}${n != null ? ` <span class="n">${n}</span>` : ''}</button>`;
+  $('#stock-chips').innerHTML = `<div class="chip-row">${chip('sf-group', '', !f.group, 'Tất cả', base.length)}${groups.map(g => chip('sf-group', g.code, f.group === g.code, g.name, gcount.get(g.code) || 0)).join('')}</div>
+    ${fcount.size ? `<div class="chip-row"><span class="small muted">Màu theo loại:</span>${FAMS.filter(([k]) => fcount.has(k) || f.fam === k).map(([k, l, c]) => chip('sf-fam', k, f.fam === k, l, fcount.get(k) || 0, `style="--c:${c}"`)).join('')}</div>` : ''}`;
+  const pool = inGroup.filter(x => !f.fam || attrsOf(x.m).fam === f.fam);
+  const uniq = fn => [...new Set(pool.map(x => fn(attrsOf(x.m))).filter(Boolean))];
+  const thks = uniq(a => a.thk).sort((a, b) => parseFloat(a) - parseFloat(b)), kinds = uniq(a => a.kind).sort((a, b) => a.localeCompare(b, 'vi'));
+  const o = (v, cur, t) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(t ?? v)}</option>`;
+  const subs = f.group ? S.subgroups.filter(s => s.group_code === f.group) : [];
+  $('#stock-f2').innerHTML = `${subs.length ? `<select data-sfilter="sub">${o('', f.sub, 'Mọi nhóm con')}${subs.map(s => o(s.id, f.sub, s.name)).join('')}</select>` : ''}
+    <select data-sfilter="thk">${o('', f.thk, 'Mọi độ dày')}${thks.map(t => o(t, f.thk, t + ' mm')).join('')}${f.thk && !thks.includes(f.thk) ? o(f.thk, f.thk, f.thk + ' mm') : ''}</select>
+    <select data-sfilter="kind">${o('', f.kind, 'Mọi phân loại')}${kinds.map(k => o(k, f.kind)).join('')}${f.kind && !kinds.includes(f.kind) ? o(f.kind, f.kind) : ''}</select>
+    <select data-sfilter="sort">${SORTS.map(([k, t]) => o(k, f.sort, 'Xếp theo: ' + t)).join('')}</select>
+    <button class="btn sm" data-act="sf-dir">${f.dir < 0 ? '⬇ Giảm dần' : '⬆ Tăng dần'}</button>
+    ${f.group || f.sub || f.thk || f.kind || f.fam || f.out || f.low || f.q || f.loc || f.cond ? '<button class="btn sm ghost" data-act="sf-clear">✕ Bỏ lọc</button>' : ''}`;
 }
 function renderStock() {
   if (!$('#stock-table')) return;
@@ -74,20 +120,27 @@ function renderStock() {
     <div class="kpi"><div class="v">${S.stock.filter(s => s.site_id && Number(s.qty) > 0).length}</div><div class="l">Dòng đang ở công trường</div></div>
     <div class="kpi"><div class="v">${held}</div><div class="l">Dòng đang giữ hàng cho PR</div></div>
     <div class="kpi"><div class="v v-sm">${last ? esc(fmtDT(last.updated_at)) : '—'}</div><div class="l">Cập nhật gần nhất${last ? ' · ' + esc(profName(last.updated_by)) : ''}</div></div></div>`;
+  renderStockFilters();
   const list = stockRows(); const MAX = 500;
   if (!list.length) { $('#stock-table').innerHTML = '<div class="card empty">Không có dòng tồn kho nào khớp bộ lọc.</div>'; return; }
+  const showA = list.some(({ m }) => { const a = attrsOf(m); return a.thk || a.kind || a.coat; });
+  const f = S.sfilters;
+  const th = (k, t, cls = '') => `<th class="sortable ${cls}" data-act="stock-sort" data-k="${k}">${t}${f.sort === k ? (f.dir < 0 ? ' ▼' : ' ▲') : ''}</th>`;
+  const av = (v, g, unit = '') => v ? `<span class="${g ? 'guess' : ''}" ${g ? 'title="Tự nhận từ tên / quy cách"' : ''}>${esc(v)}${unit}</span>` : '<span class="muted">—</span>';
+  const aCells = m => { if (!showA) return ''; const a = attrsOf(m); return `<td class="nowrap">${av(a.thk, a.guessed.thk, a.thk ? ' mm' : '')}</td><td>${a.kind ? `<span class="badge b-gray ${a.guessed.kind ? 'guess' : ''}">${esc(a.kind)}</span>` : '<span class="muted">—</span>'}</td><td class="nowrap mono small">${av(a.coat, a.guessed.coat)}</td>`; };
+  const famStyle = m => { const a = attrsOf(m); const c = (FAMS.find(x => x[0] === a.fam) || [])[2]; return c ? ` class="fam" style="--c:${c}"` : ''; };
   $('#stock-table').innerHTML = `<div class="small muted mb-s">${list.length} dòng${list.length > MAX ? ` (hiển thị ${MAX})` : ''} · "Đang giữ" = đã dành cho PR đã duyệt, chưa xuất</div>
     <div class="table-wrap"><table class="stock-table">
-      <thead><tr><th>Ảnh</th><th>Vật tư</th><th>ĐVT</th><th>Vị trí</th><th>Tình trạng</th><th class="right">Tồn</th><th class="right">Đang giữ</th><th class="right">Còn trống</th><th>Cập nhật</th>${staff ? '<th></th>' : ''}</tr></thead>
+      <thead><tr><th>Ảnh</th>${th('code', 'Vật tư')}${showA ? th('thk', 'Dày') + th('kind', 'Phân loại') + th('coat', 'Mã phủ') : ''}<th>ĐVT</th>${th('loc', 'Vị trí')}<th>Tình trạng</th>${th('qty', 'Tồn', 'right')}<th class="right">Đang giữ</th><th class="right">Còn trống</th>${th('updated', 'Cập nhật')}${staff ? '<th></th>' : ''}</tr></thead>
       <tbody>${list.slice(0, MAX).map(({ s, m }) => {
-        if (!s) return `<tr class="muted-row"><td><div class="sthumb noimg">—</div></td><td>${matCell(m)}</td><td>${esc(m.unit)}</td><td><b>Kho tổng</b></td><td></td><td class="right muted">0</td><td></td><td></td><td class="small muted">chưa khai báo</td>
+        if (!s) return `<tr class="muted-row"><td><div class="sthumb noimg">—</div></td><td>${matCell(m)}</td>${aCells(m)}<td>${esc(m.unit)}</td><td><b>Kho tổng</b></td><td></td><td class="right muted">0</td><td></td><td></td><td class="small muted">chưa khai báo</td>
           ${staff ? `<td><button class="btn sm" data-act="stock-declare" data-mid="${m.id}">Khai báo tồn</button></td>` : ''}</tr>`;
         const reserved = round6(dd.openKhoByStock.get(s.id) || 0); const free = round6(Number(s.qty) - reserved);
-        return `<tr>
+        return `<tr${famStyle(m)}>
           <td>${imgTag(s.image_path || m.image_path, m.name, 'sthumb')}</td>
-          <td>${matCell(m)}${s.note ? `<div class="small">📝 ${esc(s.note)}</div>` : ''}</td><td>${esc(m.unit)}</td>
+          <td>${matCell(m)}${s.note ? `<div class="small">📝 ${esc(s.note)}</div>` : ''}</td>${aCells(m)}<td>${esc(m.unit)}</td>
           <td>${locCell(s.site_id, s.location_detail)}</td><td>${badge(COND, s.condition)}</td>
-          <td class="right"><b>${fmtN(s.qty)}</b></td>
+          <td class="right ${Number(s.qty) <= 0 ? 'stock-low' : ''}"><b>${fmtN(s.qty)}</b></td>
           <td class="right">${reserved ? fmtN(reserved) : ''}</td><td class="right">${s.site_id || !USABLE.includes(s.condition) ? '' : fmtN(free)}</td>
           <td class="small muted nowrap">${esc(fmtDT(s.updated_at))}</td>
           ${staff ? `<td class="nowrap"><button class="btn sm" data-act="stock-edit" data-id="${s.id}" title="Sửa số tồn, vị trí">✏</button>
@@ -105,16 +158,23 @@ async function stockEdit(id) {
     body: `<p class="small muted">${esc(locLabel(s.site_id))} · ${esc(COND[s.condition][0])}${reserved ? ` · đang giữ ${fmtN(reserved)} ${esc(m.unit)} cho PR` : ''}</p>
       <div class="form"><label class="f"><span class="req">Số lượng tồn (${esc(m.unit)})</span><input id="se-qty" inputmode="decimal" value="${numInput(s.qty)}"></label>
       <label class="f">Vị trí chi tiết<input id="se-loc" value="${esc(s.location_detail || '')}" placeholder="vd: Bãi A, kệ 3"></label>
-      <label class="f">Ghi chú<input id="se-note" value="${esc(s.note || '')}"></label></div>`,
+      <label class="f">Ghi chú<input id="se-note" value="${esc(s.note || '')}"></label></div>
+      <p class="small muted mt">Thuộc tính vật tư (dùng để lọc, báo cáo kho — áp dụng cho mã ${esc(m.code)} ở mọi vị trí). Để trống = tự nhận từ tên.</p>
+      <div class="form"><label class="f">Độ dày (mm)<input id="se-thk" value="${esc(m.thickness || '')}" placeholder="${esc(attrsOf(m).thk || 'vd: 17')}"></label>
+      <label class="f">Phân loại<input id="se-kind" list="se-kinds" value="${esc(m.kind || '')}" placeholder="${esc(attrsOf(m).kind || 'vd: Melamine 2 mặt')}">
+        <datalist id="se-kinds">${['Ván thô', 'Ván chống ẩm', 'Melamine 1 mặt', 'Melamine 2 mặt', 'Laminate 1 mặt', 'Laminate 2 mặt', 'Veneer 1 mặt', 'Veneer 2 mặt', 'Phủ men 1 mặt', 'Phủ men 2 mặt', 'Phủ film PVC 2 mặt', 'Gỗ ghép', 'Gỗ xẻ'].map(k => `<option value="${k}">`).join('')}</datalist></label>
+      <label class="f">Mã phủ (melamine / laminate)<input id="se-coat" value="${esc(m.coat_code || '')}" placeholder="${esc(attrsOf(m).coat || 'vd: LK705D')}"></label></div>`,
     actions: [{ label: 'Huỷ', value: null }, { label: 'Lưu', value: 'ok', primary: true, validate: v => {
       const q = parseNum(v.qty); if (q == null || Number.isNaN(q) || q < 0) return 'Số lượng tồn không hợp lệ';
       if (q < reserved) return `Đang giữ ${fmtN(reserved)} cho PR, không thể thấp hơn`; return null; } }],
-    read: ov => ({ qty: $('#se-qty', ov).value, loc: $('#se-loc', ov).value, note: $('#se-note', ov).value }),
+    read: ov => ({ qty: $('#se-qty', ov).value, loc: $('#se-loc', ov).value, note: $('#se-note', ov).value,
+                   thickness: $('#se-thk', ov).value.trim(), kind: $('#se-kind', ov).value.trim(), coat_code: $('#se-coat', ov).value.trim() }),
   });
   if (action !== 'ok') return;
   const f = { location_detail: data.loc, note: data.note };
   if (parseNum(data.qty) !== Number(s.qty)) f.qty = parseNum(data.qty);
-  runAction(() => ctx.B.updateStock(id, f), 'Đã cập nhật tồn kho');
+  const attrs = {}; for (const k of ['thickness', 'kind', 'coat_code']) if (data[k] !== (m[k] || '')) attrs[k] = data[k];
+  runAction(async () => { await ctx.B.updateStock(id, f); if (Object.keys(attrs).length) await ctx.B.updateMaterialAttrs(m.id, attrs); }, 'Đã cập nhật tồn kho');
 }
 async function stockMove(id) {
   const s = S.stock.find(x => x.id === id); const m = D().mat.get(s.material_id); const free = s.site_id ? Number(s.qty) : stockFree(s.id);
@@ -628,11 +688,54 @@ function groupsHTML() {
 }
 async function refreshGroups() { await hooks.pull().catch(() => {}); const el = $('#grp-body'); if (el) el.innerHTML = groupsHTML(); }
 
+/* ---------- Báo cáo tồn kho (theo bộ lọc đang chọn) ---------- */
+function filterDesc() {
+  const f = S.sfilters, parts = [];
+  if (f.group) parts.push('Nhóm: ' + groupName(f.group));
+  if (f.sub) parts.push('Nhóm con: ' + ((S.subgroups.find(x => x.id === f.sub) || {}).name || ''));
+  if (f.fam) parts.push('Loại: ' + (FAMS.find(x => x[0] === f.fam) || [])[1]);
+  if (f.thk) parts.push('Độ dày: ' + f.thk + ' mm'); if (f.kind) parts.push('Phân loại: ' + f.kind);
+  if (f.loc) parts.push('Vị trí: ' + (f.loc === 'kho' ? 'Kho tổng' : f.loc)); if (f.cond) parts.push('Tình trạng: ' + COND[f.cond][0]);
+  if (f.has) parts.push('Chỉ dòng có tồn'); if (f.out) parts.push('Chỉ hết hàng'); if (f.low) parts.push('Dưới tồn tối thiểu');
+  if (f.q) parts.push(`Tìm: "${f.q}"`);
+  return parts.join(' · ') || 'Toàn bộ kho';
+}
+function exportStockReport() {
+  const list = stockRows(); if (!list.length) return toast('Không có dữ liệu để xuất', 'err');
+  const dd = D(), now = fmtDT(new Date().toISOString());
+  const head = ['STT', 'Mã VT', 'Tên vật tư', 'Quy cách', 'Nhóm', 'Nhóm con', 'Độ dày (mm)', 'Phân loại', 'Mã phủ', 'ĐVT', 'Vị trí', 'Vị trí chi tiết', 'Tình trạng', 'Tồn', 'Đang giữ cho PR', 'Còn trống', 'Tồn tối thiểu', 'Cập nhật', 'Ghi chú'];
+  const rows = list.map(({ s, m }, i) => {
+    const a = attrsOf(m); const reserved = s ? round6(dd.openKhoByStock.get(s.id) || 0) : 0;
+    return [i + 1, m.code, m.name, m.spec || '', groupName(m.group_code), (S.subgroups.find(x => x.id === m.subgroup_id) || {}).name || '', a.thk ? Number(a.thk) : '', a.kind, a.coat, m.unit,
+      s ? locLabel(s.site_id) : 'Kho tổng', s ? s.location_detail || '' : '', s ? COND[s.condition][0] : '', s ? Number(s.qty) : 0, reserved || '',
+      s && !s.site_id && USABLE.includes(s.condition) ? round6(Number(s.qty) - reserved) : '', s && s.min_qty != null ? Number(s.min_qty) : '', s ? fmtDT(s.updated_at) : 'chưa khai báo', s ? s.note || '' : ''];
+  });
+  const title = [[`BÁO CÁO TỒN KHO — ${CONFIG.COMPANY}`], [`Ngày xuất: ${now} · Người xuất: ${profName(S.user.id)}`], [`Bộ lọc: ${filterDesc()}`], [`Số dòng: ${rows.length}`], []];
+  // Tổng hợp theo nhóm + phân loại + ĐVT
+  const sum = new Map();
+  for (const { s, m } of list) {
+    const a = attrsOf(m); const k = [groupName(m.group_code), a.kind || '', a.thk || '', m.unit].join('\u0001');
+    const r = sum.get(k) || { lines: 0, qty: 0, held: 0, out: 0 };
+    r.lines++; if (s) { r.qty += Number(s.qty); r.held += dd.openKhoByStock.get(s.id) || 0; } if (!s || Number(s.qty) <= 0) r.out++;
+    sum.set(k, r);
+  }
+  const sumRows = [...sum].sort(([a], [b]) => a.localeCompare(b, 'vi')).map(([k, r]) => { const [g, kind, thk, unit] = k.split('\u0001'); return [g, kind, thk ? Number(thk) : '', unit, r.lines, round6(r.qty), round6(r.held) || '', r.out || '']; });
+  exportBook([
+    { name: 'Ton kho', aoa: [...title, head, ...rows], cols: [5, 12, 40, 18, 18, 16, 10, 18, 14, 7, 16, 18, 14, 10, 12, 10, 10, 17, 24], merges: [0, 1, 2, 3].map(r => ({ s: { r, c: 0 }, e: { r, c: 8 } })) },
+    { name: 'Tong hop', aoa: [...title.slice(0, 3), [], ['Nhóm', 'Phân loại', 'Độ dày (mm)', 'ĐVT', 'Số mã / dòng', 'Tổng tồn', 'Đang giữ', 'Số dòng hết hàng'], ...sumRows], cols: [22, 20, 12, 8, 12, 12, 10, 14] },
+  ], `bao-cao-ton-kho-${todayISO()}`);
+}
+
 /* ---------- Sự kiện ---------- */
 const onS = debounce(() => renderStock(), 200), onA = debounce(() => renderAssets(), 200);
 INPUTS.push(e => {
   const t = e.target;
-  if (t.dataset.sfilter) { S.sfilters[t.dataset.sfilter] = t.type === 'checkbox' ? t.checked : t.value; onS(); return true; }
+  if (t.dataset.sfilter) {
+    const k = t.dataset.sfilter, f = S.sfilters; f[k] = t.type === 'checkbox' ? t.checked : t.value;
+    if (k === 'out' && f.out) f.has = false; if (k === 'has' && f.has) f.out = false;
+    if (k === 'out' || k === 'has') { hooks.render(); return true; }
+    onS(); return true;
+  }
   if (t.dataset.afilter) { S.afilters[t.dataset.afilter] = t.value; onA(); return true; }
   if (t.dataset.qr) { t.checked ? qrSel.add(t.dataset.qr) : qrSel.delete(t.dataset.qr); return true; }
   if ('qrall' in t.dataset) { for (const a of assetList()) t.checked ? qrSel.add(a.id) : qrSel.delete(a.id); renderAssets(); return true; }
@@ -646,11 +749,14 @@ Object.assign(ACT, {
   'stock-declare': b => stockDeclare(b.dataset.mid),
   'stock-img': async b => { const img = await pickOneImage(); if (img) runAction(async () => ctx.B.updateStock(b.dataset.id, { image_path: await ctx.B.uploadImage(img) }), 'Đã cập nhật ảnh'); },
   'stock-new': () => stockNew(),
+  'sf-group': b => { const f = S.sfilters; f.group = f.group === b.dataset.v ? '' : b.dataset.v; f.sub = ''; renderStock(); },
+  'sf-fam': b => { const f = S.sfilters; f.fam = f.fam === b.dataset.v ? '' : b.dataset.v; renderStock(); },
+  'sf-dir': () => { S.sfilters.dir = -(S.sfilters.dir || 1); renderStock(); },
+  'stock-sort': b => { const f = S.sfilters; if (f.sort === b.dataset.k) f.dir = -(f.dir || 1); else { f.sort = b.dataset.k; f.dir = 1; } renderStock(); },
+  'sf-clear': () => { Object.assign(S.sfilters, { q: '', group: '', sub: '', thk: '', kind: '', fam: '', loc: '', cond: '', out: false, low: false }); hooks.render(); },
   'stock-import': () => stockImport(),
   'stock-template': () => stockTemplate(),
-  'stock-export': () => exportRows(stockRows().filter(x => x.s).map(({ s, m }) => ({ 'Mã VT': m.code, 'Tên vật tư': m.name, 'Quy cách': m.spec || '', 'ĐVT': m.unit, 'Nhóm': groupName(m.group_code),
-    'Vị trí': locLabel(s.site_id), 'Vị trí chi tiết': s.location_detail || '', 'Tình trạng': COND[s.condition][0], 'Số lượng tồn': Number(s.qty),
-    'Đang giữ cho PR': round6(D().openKhoByStock.get(s.id) || 0), 'Cập nhật': fmtDT(s.updated_at) })), `ton-kho-${todayISO()}`, 'Tồn kho'),
+  'stock-export': () => exportStockReport(),
   'asset-loc': b => { S.afilters.loc = S.afilters.loc === b.dataset.v ? '' : b.dataset.v; hooks.render(); },
   'asset-cond': b => { S.afilters.cond = S.afilters.cond === b.dataset.v ? '' : b.dataset.v; hooks.render(); },
   'asset-open': b => assetOpen(b.dataset.id),

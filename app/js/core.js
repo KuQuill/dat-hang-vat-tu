@@ -87,7 +87,7 @@ export const S = {
   draft: null, draftImages: [],
   tab: LS.get(KEY.tab, 'info'), khoTab: 'stock',
   filters: { q: '', site: '', status: '', from: '', to: '', mine: false, late: false, kpi: '' },
-  sfilters: { q: '', group: '', loc: '', cond: '', has: true, low: false },
+  sfilters: { q: '', group: '', sub: '', thk: '', kind: '', fam: '', loc: '', cond: '', has: true, low: false, out: false, sort: 'code', dir: 1 },
   afilters: { q: '', group: '', loc: '', cond: '' },
   pfilters: { status: '' },
   ufilter: '',
@@ -309,6 +309,20 @@ export async function exportRows(rows, name, sheet) {
     downloadText(csv, name + '.csv', 'text/csv;charset=utf-8');
     toast('Không tải được thư viện Excel — đã xuất file CSV', '');
   }
+}
+// Xuất nhiều sheet; mỗi sheet: { name, aoa: mảng 2 chiều, cols: độ rộng cột, merges }
+export async function exportBook(sheets, name) {
+  try {
+    if (!window.XLSX) await new Promise((res, rej) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+    const wb = window.XLSX.utils.book_new();
+    for (const sh of sheets) {
+      const ws = window.XLSX.utils.aoa_to_sheet(sh.aoa);
+      if (sh.cols) ws['!cols'] = sh.cols.map(w => ({ wch: w }));
+      if (sh.merges) ws['!merges'] = sh.merges;
+      window.XLSX.utils.book_append_sheet(wb, ws, sh.name);
+    }
+    window.XLSX.writeFile(wb, name + '.xlsx');
+  } catch { toast('Không tải được thư viện Excel (kiểm tra mạng)', 'err'); }
 }
 export function downloadText(text, name, type) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click();

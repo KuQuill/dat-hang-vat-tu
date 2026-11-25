@@ -447,6 +447,12 @@ export function DemoBackend() {
       }
       save(); return delay(n);
     },
+    updateMaterialAttrs: (id, fields) => tx(() => {
+      req(['procurement', 'admin']);
+      const m = db.materials.find(x => x.id === id) || fail('Vật tư không tồn tại');
+      for (const k of ['thickness', 'kind', 'coat_code']) if (k in fields) m[k] = String(fields[k] || '').trim() || null;
+      return null;
+    }),
     deleteWorkCategory: code => tx(() => {
       req(['manager', 'admin']);
       const i = db.workCats.findIndex(w => w.code === code); if (i < 0) fail(`Không tìm thấy hạng mục ${code}`);

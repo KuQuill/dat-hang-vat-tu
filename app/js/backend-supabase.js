@@ -37,7 +37,7 @@ export function SupaBackend() {
         all('material_groups', '*', q => q.order('priority')),
         all('material_subgroups', '*', q => q.order('name')),
         all('work_categories', '*', q => q.order('sort')),
-        all('materials', 'id,code,name,spec,unit,group_code,subgroup_id,image_path,is_new,active,name_en,spec_en', q => q.order('code')),
+        all('materials', 'id,code,name,spec,unit,group_code,subgroup_id,image_path,is_new,active,name_en,spec_en,thickness,kind,coat_code', q => q.order('code')),
         all('profiles', 'id,email,full_name,phone,role,site_id,active', q => q.order('full_name')),
         all('stock', '*'),
         all('assets', '*', q => q.order('asset_code')),
@@ -116,6 +116,7 @@ export function SupaBackend() {
     resolveIssue: (id, action, note, eta) => rpc('resolve_issue', { p_delivery: id, p_action: action, p_note: note, p_eta: eta || null }),
 
     setStock: (rows, mode, reason) => rpc('set_stock', { p_rows: rows, p_mode: mode, p_reason: reason || null }),
+    updateMaterialAttrs: (id, fields) => rpc('update_material_attrs', { p_id: id, p_fields: fields }),
     updateStock: (id, fields) => rpc('update_stock', { p_id: id, p_fields: fields }),
     moveStock: (id, f) => rpc('move_stock', { p_id: id, p_qty: f.qty, p_to_site: f.site || '', p_to_condition: f.condition || null, p_location: f.location || null, p_note: f.note || null }),
     saveAsset: p => rpc('save_asset', { p }),

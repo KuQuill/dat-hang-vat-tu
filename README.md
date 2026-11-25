@@ -98,6 +98,11 @@ Phòng vật tư thêm nhóm / nhóm con trong *Kho & tài sản → 🗂 Nhóm 
 
 ---
 
+### Lọc & báo cáo tồn kho
+- **Kho & tài sản → Vật tư**: chip lọc theo **nhóm**, chip **màu theo loại** (Melamine, Laminate, Veneer, Phủ men, Phủ film PVC, Ván thô, Gỗ tự nhiên), lọc **nhóm con, độ dày, phân loại, vị trí, tình trạng**, **chỉ hết hàng**, **dưới tồn tối thiểu**; sắp xếp theo mã / tên / nhóm / độ dày / phân loại / mã phủ / tồn / vị trí / ngày cập nhật (bấm tiêu đề cột hoặc chọn "Xếp theo").
+- Độ dày, phân loại, mã phủ: khai báo ở nút ✏ của dòng tồn; để trống thì tự nhận từ tên (vd "MDF 17MM PHỦ MELAMINE 2 MẶT", "PLYWOOD 12M", "LK705D") — chữ nghiêng = tự nhận.
+- **⬇ Xuất báo cáo kho**: file Excel theo đúng bộ lọc và thứ tự đang xem — sheet *Ton kho* (chi tiết, có tiêu đề, ngày, người xuất, bộ lọc) và sheet *Tong hop* (theo nhóm · phân loại · độ dày · ĐVT).
+
 ### Tiếng Việt / English
 - Nút **🌐 EN / 🌐 VI** ở góc trên (và ở trang đăng nhập) chuyển giao diện; lựa chọn lưu trên từng máy.
 - Chữ giao diện dịch theo từ điển `app/js/i18n-en.js` (thêm câu mới vào đây khi sửa giao diện). Phiếu PDF và file xuất Excel/CSV giữ tiếng Việt.
@@ -120,7 +125,7 @@ Phòng vật tư thêm nhóm / nhóm con trong *Kho & tài sản → 🗂 Nhóm 
 ## Bước 1 — Tạo Supabase
 
 1. https://supabase.com → **New project** → Region **Southeast Asia (Singapore)**.
-2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql`, `004_roles_manager.sql`, `005_workshop_alloc.sql`, `006_audit_log.sql`, `007_delete_site_category.sql`, `008_english_names.sql` (thư mục `supabase/migrations/`).
+2. **SQL Editor** → chạy lần lượt `001_init.sql`, `002_pr_code_recall_sites.sql`, `003_work_categories_receiver.sql`, `004_roles_manager.sql`, `005_workshop_alloc.sql`, `006_audit_log.sql`, `007_delete_site_category.sql`, `008_english_names.sql`, `009_material_attrs.sql` (thư mục `supabase/migrations/`).
 3. Thêm công trường:
    ```sql
    insert into public.sites (code, name, address, manager) values
