@@ -264,14 +264,20 @@ function matchScore(h, syns) {
   for (const s of syns) { if (h === s) return 3; if (s.length >= 2 && (h.startsWith(s + ' ') || h.endsWith(' ' + s))) best = Math.max(best, 2); else if (s.length >= 4 && h.includes(s)) best = Math.max(best, 1); }
   return best;
 }
-function guessHeader(rows) {
+function headerScore(rows) {
   let best = { row: -1, score: 0 };
   for (let r = 0; r < Math.min(rows.length, 30); r++) {
     const hs = rows[r].map(hnorm); let score = 0;
     for (const [, , syns] of SF) if (hs.some(h => matchScore(h, syns) >= 2)) score++;
     if (score > best.score) best = { row: r, score };
   }
-  return best.score >= 2 ? best.row : 0;
+  return best;
+}
+function guessHeader(rows) { const b = headerScore(rows); return b.score >= 2 ? b.row : 0; }
+// Sheet mặc định: sheet có tiêu đề khớp nhiều cột nhập kho nhất (ưu tiên tên "nhập kho / tồn kho"), hoà thì lấy sheet nhiều dòng hơn
+function pickSheet(sheets) {
+  const rank = s => headerScore(s.rows).score * 10 + (/nhap kho|ton kho|^kho/.test(norm(s.name)) ? 5 : 0) - (/doi chieu|thong ke|huong dan|can kiem tra|het ton/.test(norm(s.name)) ? 50 : 0);
+  return sheets.reduce((a, s, i) => { const d = rank(s) - rank(sheets[a]); return d > 0 || (d === 0 && s.rows.length > sheets[a].rows.length) ? i : a; }, 0);
 }
 function guessMap(header) {
   const hs = header.map(hnorm), map = {}, used = new Set(), cand = [];
@@ -340,8 +346,7 @@ async function stockImportFile(file) {
   catch (e) { return toast(e.message || 'Không đọc được file Excel', 'err'); }
   if (!wb.sheets.length) return toast('File không có dữ liệu', 'err');
   if (wb.imgErr) toast(wb.imgErr, 'err');
-  // chọn sheet có nhiều dòng nhất làm mặc định
-  const st = { sheet: wb.sheets.reduce((a, s, i) => s.rows.length > wb.sheets[a].rows.length ? i : a, 0) };
+  const st = { sheet: pickSheet(wb.sheets) };
   const reset = () => { const sh = wb.sheets[st.sheet]; st.hdr = guessHeader(sh.rows); st.map = guessMap(sh.rows[st.hdr] || []); };
   reset();
   const urls = [];
