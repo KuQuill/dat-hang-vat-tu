@@ -249,6 +249,7 @@ const SF = [
   ['spec', 'Quy cách', ['quy cach', 'thong so', 'thong so ky thuat', 'kich thuoc', 'model', 'chung loai', 'dac tinh', 'quy cach ky thuat']],
   ['unit', 'ĐVT', ['dvt', 'don vi', 'don vi tinh', 'dv', 'd.v.t', 'unit']],
   ['group', 'Nhóm', ['nhom', 'nhom vat tu', 'loai', 'nhom hang']],
+  ['subgroup', 'Nhóm con', ['nhom con', 'phan nhom', 'nhom phu', 'loai con']],
   ['qty', 'Số lượng', ['so luong', 'sl', 'ton', 'ton kho', 'ton cuoi', 'ton cuoi ky', 'sl ton', 'so luong ton', 'so luong ton kho', 'khoi luong', 'qty']],
   ['site', 'Vị trí (kho / mã dự án)', ['vi tri', 'kho', 'cong trinh', 'du an', 'ma du an', 'noi de', 'ma cong trinh']],
   ['location', 'Vị trí chi tiết', ['vi tri chi tiet', 'ke', 'ngan', 'vi tri luu kho', 'vi tri de', 'o ke']],
@@ -292,7 +293,7 @@ function buildRows(sheet, hdr, map, defSite, defCond) {
     if (q == null || Number.isNaN(q)) { skipped.push(i + 1); continue; } // dòng tiêu đề nhóm / tổng cộng / chưa có số lượng
     const site = cellStr(g(r, 'site'));
     out.push({ excelRow: i + 1, img: sheet.images.get(i) || null,
-      code, name, spec: cellStr(g(r, 'spec')), unit: cellStr(g(r, 'unit')), group: cellStr(g(r, 'group')), qty: q,
+      code, name, spec: cellStr(g(r, 'spec')), unit: cellStr(g(r, 'unit')), group: cellStr(g(r, 'group')), subgroup: cellStr(g(r, 'subgroup')), qty: q,
       site: site && !/^kho tong$/.test(norm(site)) ? site : (defSite === 'kho' ? '' : defSite),
       location: cellStr(g(r, 'location')), condition: cellStr(g(r, 'condition')) || defCond,
       min_qty: map.min_qty >= 0 && cellStr(g(r, 'min_qty')) !== '' ? qtyVal(g(r, 'min_qty')) : null, note: cellStr(g(r, 'note')) });
@@ -419,17 +420,17 @@ async function stockTemplate() {
   try {
     const { loadXlsxLibs } = await import('./xlsx-read.js'); await loadXlsxLibs();
     const X = window.XLSX;
-    const head = ['Mã VT', 'Tên vật tư', 'Quy cách', 'ĐVT', 'Nhóm', 'Số lượng', 'Vị trí (Kho tổng / mã dự án)', 'Vị trí chi tiết', 'Tình trạng', 'Tồn tối thiểu', 'Ghi chú', 'Hình ảnh'];
+    const head = ['Mã VT', 'Tên vật tư', 'Quy cách', 'ĐVT', 'Nhóm', 'Nhóm con', 'Số lượng', 'Vị trí (Kho tổng / mã dự án)', 'Vị trí chi tiết', 'Tình trạng', 'Tồn tối thiểu', 'Ghi chú', 'Hình ảnh'];
     const ws = X.utils.aoa_to_sheet([head,
-      ['KC-0002', 'Thép thanh vằn D16', 'CB400-V', 'tấn', 'KC', 12, 'Kho tổng', 'Bãi thép A', 'Mới', 2, '', '(dán ảnh vào ô này)'],
-      ['', 'Giàn giáo khung 1.7m', '', 'bộ', 'DC', 80, 'LA01', '', 'Đã qua sử dụng', '', '', '(dán ảnh vào ô này)']]);
-    ws['!cols'] = [10, 32, 18, 8, 8, 10, 26, 18, 16, 12, 24, 22].map(wch => ({ wch }));
+      ['KC-0002', 'Thép thanh vằn D16', 'CB400-V', 'tấn', 'KC', 'Thép', 12, 'Kho tổng', 'Bãi thép A', 'Mới', 2, '', '(dán ảnh vào ô này)'],
+      ['', 'Giàn giáo khung 1.7m', '', 'bộ', 'DC', 'Giàn giáo', 80, 'LA01', '', 'Đã qua sử dụng', '', '', '(dán ảnh vào ô này)']]);
+    ws['!cols'] = [10, 32, 18, 8, 8, 14, 10, 26, 18, 16, 12, 24, 22].map(wch => ({ wch }));
     ws['!rows'] = [{ hpx: 22 }, ...Array.from({ length: 200 }, () => ({ hpx: 60 }))];
     const guide = X.utils.aoa_to_sheet([
       ['HƯỚNG DẪN NHẬP TỒN KHO'], [''],
       ['1. Có thể dùng luôn file Excel kho đang có, không bắt buộc theo mẫu này. Khi nhập, hệ thống tự nhận cột theo dòng tiêu đề và cho chỉnh lại.'],
       ['2. Bắt buộc: Tên vật tư (hoặc Mã VT đã có), ĐVT (khi tạo mã mới), Số lượng. Dòng không có số lượng (tiêu đề nhóm, tổng cộng) sẽ được bỏ qua.'],
-      ['3. Có Mã VT thì cập nhật đúng mã đó. Không có mã thì tìm vật tư trùng tên; không có nữa thì tự cấp mã mới.'],
+      ['3. Có Mã VT thì cập nhật đúng mã đó; mã chưa có trên hệ thống nhưng đúng dạng <mã nhóm>-<số> (vd MEP-0120) thì tạo vật tư mới với đúng mã đó. Không có mã thì tìm vật tư trùng tên; không có nữa thì tự cấp mã mới.'],
       ['4. Vị trí: để trống hoặc "Kho tổng" = kho tổng; hoặc ghi mã dự án (vd LA01).'],
       ['5. Tình trạng: Mới / Đã qua sử dụng / Hỏng / Đang sửa.'],
       ['6. Hình ảnh: bấm vào ô cột Hình ảnh của dòng → Insert (Chèn) → Pictures (Ảnh) → Place in Cell (Đặt trong ô); hoặc chèn ảnh rồi kéo cho nằm gọn trong ô của dòng đó. Mỗi dòng 1 ảnh.'],

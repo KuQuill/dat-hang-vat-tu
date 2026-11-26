@@ -372,4 +372,6 @@ export default {
   'Ván thô': 'Raw board', 'Ván chống ẩm': 'Moisture-resistant board', 'Gỗ ghép': 'Finger-jointed wood', 'Gỗ xẻ': 'Sawn timber',
   'Melamine {} mặt': 'Melamine {} side(s)', 'Laminate {} mặt': 'Laminate {} side(s)', 'Veneer {} mặt': 'Veneer {} side(s)', 'Phủ men {} mặt': 'Enamel {} side(s)', 'Phủ film PVC {} mặt': 'PVC film {} side(s)',
   'Không tải được thư viện Excel (kiểm tra mạng)': 'Could not load the Excel library (check your network)',
+  '3. Có Mã VT thì cập nhật đúng mã đó; mã chưa có trên hệ thống nhưng đúng dạng <mã nhóm>-<số> (vd MEP-0120) thì tạo vật tư mới với đúng mã đó. Không có mã thì tìm vật tư trùng tên; không có nữa thì tự cấp mã mới.': '3. With an Item code, that code is updated; a code not yet in the system but in the form <group code>-<number> (e.g. MEP-0120) creates a new material with exactly that code. Without a code, a material with the same name is used; otherwise a new code is created.',
+  'Mã {} trên hệ thống là "{}", khác tên trong file "{}"': 'Code {} in the system is "{}", which differs from the name in the file "{}"',
 };

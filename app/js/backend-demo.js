@@ -645,7 +645,19 @@ export function DemoBackend() {
           const site = siteOf(r.site); const cond = parseCond(r.condition);
           let m = null, wasCreated = false;
           if (r.material_id) m = mat(r.material_id) || fail('vật tư không tồn tại');
-          else if ((r.code || '').trim()) { m = db.materials.find(x => x.code.toUpperCase() === r.code.trim().toUpperCase()); if (!m && !(r.name || '').trim()) fail('không có mã ' + r.code); }
+          else if ((r.code || '').trim()) {
+            const code = r.code.trim().toUpperCase();
+            m = db.materials.find(x => x.code.toUpperCase() === code); if (!m && !(r.name || '').trim()) fail('không có mã ' + r.code);
+            // mã mới đúng dạng <nhóm>-<số> → tạo vật tư với đúng mã đó (giống set_stock trên Supabase)
+            const cm = !m && /^([A-Z]{1,4})-(\d{3,6})$/.exec(code); const g = cm && db.groups.find(x => x.code === cm[1]);
+            if (g) {
+              if (!String(r.unit || '').trim()) fail(`Vật tư mới "${r.name}" cần có đơn vị tính`);
+              const sub = (r.subgroup || '').trim() && db.subgroups.find(x => x.group_code === g.code && norm(x.name) === norm(r.subgroup));
+              m = { id: uid(), code, name: r.name.trim(), spec: (r.spec || '').trim() || null, unit: r.unit.trim(), group_code: g.code, subgroup_id: sub ? sub.id : null,
+                    image_path: null, is_new: false, active: true, created_by: u.id, created_via: 'import', created_at: now() };
+              db.materials.push(m); g.seq = Math.max(g.seq || 0, Number(cm[2])); wasCreated = true;
+            }
+          }
           if (!m) { const x = findOrCreate(u, r, 'import'); wasCreated = x.created; m = mat(x.id); }
           if (kindOf(m.id) === 'tung_cai') fail(`${m.code} thuộc nhóm quản lý từng chiếc — khai báo ở mục Tài sản / thiết bị`);
           ids.push(stockApply(u, m.id, site, cond, mode, qty, r.location, min, (r.note || '').trim() || (reason || '').trim() || mode));
