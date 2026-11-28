@@ -9,5 +9,5 @@ export const CONFIG = {
   SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt6dXp0bGt5Z3VmcG9qcGh5eXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU0MjE0MjcsImV4cCI6MjExMDk5NzQyN30._ycKgJg2Xn40yTYbjLSiCBWZFweX2j5uukhE2Txhs-s',
   // Bot MekoCons (Render): widget chat góc trang + trang chat quản lý chat.html. Để trống để tắt chatbot.
   CHATBOT_API: 'https://mkc-chatbot-company.onrender.com',
-  APP_VERSION: '3.2.0',      // tăng mỗi lần phát hành, đồng thời sửa CACHE trong sw.js
+  APP_VERSION: '3.2.1',      // tăng mỗi lần phát hành, đồng thời sửa CACHE trong sw.js
 };

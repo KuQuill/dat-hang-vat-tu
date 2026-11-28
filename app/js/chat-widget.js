@@ -1,12 +1,12 @@
 // Widget chat góc phải dưới: chỉ hiện khi đã đăng nhập web vật tư.
-import { API_BASE, ApiError, ENABLED, api, esc, filesHtml, hasSession, linkCardHtml, md } from './chatbot-core.js';
+import { API_BASE, ApiError, ENABLED, api, autoHide, esc, filesHtml, hasSession, md, notStaffHtml } from './chatbot-core.js';
 
 const ICON_CHAT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>';
 const ICON_CLOSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 const ICON_CLIP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>';
 const ICON_SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>';
 
-const st = { open: false, me: null, conv: null, files: [], busy: false, link: null, loaded: false };
+const st = { open: false, me: null, conv: null, files: [], busy: false, loaded: false };
 let root, panel, body, input, chips, sendBtn, fab;
 
 function convKey() { return 'mkcbot.widgetconv.' + (st.me ? st.me.email : ''); }
@@ -57,8 +57,6 @@ function mount() {
     else if (act === 'attach') fileInput.click();
     else if (act === 'send') send();
     else if (act === 'unfile') { st.files.splice(+b.dataset.i, 1); renderChips(); }
-    else if (act === 'link-start') linkStart();
-    else if (act === 'link-check') { st.me = null; load(true); }
   });
   fileInput.addEventListener('change', () => { st.files.push(...fileInput.files); fileInput.value = ''; renderChips(); });
   input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
@@ -102,7 +100,7 @@ async function load(force = false) {
   try {
     st.me = await api('/api/me', { onSlow: () => { body.innerHTML = '<div class="mkb-typing">Bot đang khởi động, có thể mất tới 1 phút</div>'; } });
     root.querySelector('#mkb-console').hidden = !st.me.is_manager;
-    if (!st.me.linked) { body.innerHTML = linkCardHtml(st.link); setBusy(false); input.disabled = true; return; }
+    if (!st.me.linked) { body.innerHTML = notStaffHtml(st.me); setBusy(false); input.disabled = true; return; }
     st.conv = localStorage.getItem(convKey());
     let msgs = [];
     if (st.conv) {
@@ -116,15 +114,6 @@ async function load(force = false) {
     body.innerHTML = msgHtml({ role: 'bot', error: true, text: e.message });
   } finally {
     setBusy(false);
-  }
-}
-
-async function linkStart() {
-  try {
-    st.link = await api('/api/link/start', { method: 'POST' });
-    body.innerHTML = linkCardHtml(st.link);
-  } catch (e) {
-    body.insertAdjacentHTML('beforeend', msgHtml({ role: 'bot', error: true, text: e.message }));
   }
 }
 
@@ -154,10 +143,11 @@ async function send() {
     localStorage.setItem(convKey(), st.conv);
     body.querySelector('#mkb-wait')?.remove();
     body.insertAdjacentHTML('beforeend', msgHtml({ role: 'bot', text: r.text, files: r.files }));
+    if (r.hide_after) autoHide(body.lastElementChild, r.hide_after);
   } catch (e) {
     body.querySelector('#mkb-wait')?.remove();
     body.insertAdjacentHTML('beforeend', msgHtml({ role: 'bot', error: true, text: e.message }));
-    if (e instanceof ApiError && e.code === 'not_linked') { st.me.linked = false; body.insertAdjacentHTML('beforeend', linkCardHtml(null)); }
+    if (e instanceof ApiError && e.code === 'not_linked') { st.me.linked = false; body.insertAdjacentHTML('beforeend', notStaffHtml(st.me)); }
   } finally {
     setBusy(false);
     scrollEnd();

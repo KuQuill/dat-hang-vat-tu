@@ -1,6 +1,6 @@
 // Trang chat quản lý (chat.html): chỉ admin / giám đốc. Lịch sử hội thoại, kéo thả file,
 // nạp hồ sơ dự án (Master Data) và phát hành biểu mẫu mới.
-import { ApiError, ENABLED, api, esc, filesHtml, hasSession, linkCardHtml, md } from './chatbot-core.js';
+import { ApiError, ENABLED, api, autoHide, esc, filesHtml, hasSession, md, notStaffHtml } from './chatbot-core.js';
 
 const ICON_CLIP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l8-8"/></svg>';
 const ICON_SEND = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>';
@@ -16,7 +16,7 @@ const SUGGEST = [
   ['Quy chế bảo mật', 'Tóm tắt quy chế bảo mật và phân quyền dữ liệu'],
 ];
 
-const st = { me: null, convs: [], conv: null, msgs: [], files: [], busy: false, link: null, projects: null };
+const st = { me: null, convs: [], conv: null, msgs: [], files: [], busy: false, projects: null };
 const $ = s => document.querySelector(s);
 const app = $('#app');
 
@@ -36,7 +36,7 @@ async function boot() {
   } catch (e) {
     return gate(`<p class="late-text">${esc(e.message)}</p><button class="btn" onclick="location.reload()">Thử lại</button>`);
   }
-  if (!st.me.linked) return showLink();
+  if (!st.me.linked) return gate(notStaffHtml(st.me) + '<p><a class="btn" href="./">Về web vật tư</a></p>');
   if (!st.me.is_manager) {
     return gate(`<h3 style="margin-top:0">Không có quyền</h3><p>Trang này dành cho admin / giám đốc. Bạn vẫn chat được với bot qua nút 💬 trên web vật tư.</p>
       <a class="btn primary" href="./">Về web vật tư</a>`);
@@ -44,18 +44,6 @@ async function boot() {
   shell();
   await loadConvs();
   newChat();
-}
-
-function showLink() {
-  gate(linkCardHtml(st.link));
-  app.onclick = async e => {
-    const b = e.target.closest('[data-mkb]');
-    if (!b) return;
-    if (b.dataset.mkb === 'link-start') {
-      try { st.link = await api('/api/link/start', { method: 'POST' }); gate(linkCardHtml(st.link)); }
-      catch (err) { gate(`<p class="late-text">${esc(err.message)}</p>`); }
-    } else if (b.dataset.mkb === 'link-check') { app.onclick = null; boot(); }
-  };
 }
 
 // ------------------------------------------------------------------ khung trang
@@ -86,6 +74,7 @@ function shell() {
             <span class="mkb-hint">Với file đính kèm:</span>
             <button class="btn sm" data-a="doc">📁 Nạp hồ sơ dự án</button>
             <button class="btn sm" data-a="form">📄 Phát hành biểu mẫu</button>
+            <button class="btn sm" data-a="staff" id="btn-staff" hidden>👥 Nạp danh sách nhân sự</button>
             <span class="mkb-hint">hoặc bấm Gửi để bot đọc file.</span>
           </div>
           <div class="mkb-composer">
@@ -121,6 +110,7 @@ function onClick(e) {
   else if (a === 'suggest') { const i = $('#input'); i.value = b.dataset.text; i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
   else if (a === 'doc') docModal();
   else if (a === 'form') formModal();
+  else if (a === 'staff') staffImport();
 }
 function closeNav() { $('.mkc')?.classList.remove('nav-open'); }
 
@@ -139,6 +129,8 @@ function renderChips() {
   $('#chips').innerHTML = st.files.map((f, i) =>
     `<span class="mkb-chip">📎 <span>${esc(f.name)}</span><button data-a="unfile" data-i="${i}" aria-label="Bỏ file">×</button></span>`).join('');
   $('#file-actions').hidden = st.files.length !== 1;
+  const isCsv = st.files.length === 1 && /\.csv$/i.test(st.files[0].name);
+  $('#btn-staff').hidden = !(isCsv && st.me.role === 'admin');
 }
 
 // ------------------------------------------------------------------ hội thoại
@@ -171,6 +163,9 @@ function renderThread() {
       <div class="mkc-suggest">${SUGGEST.map(([t1, q]) => `<button data-a="suggest" data-text="${esc(q)}"><b>${esc(t1)}</b><span>${esc(q)}</span></button>`).join('')}</div></div>`;
   } else {
     t.innerHTML = st.msgs.map(msgHtml).join('');
+    st.msgs.forEach((m, i) => {
+      if (m.hide_after) { autoHide(t.children[i], m.hide_after); m.hide_after = 0; m.text = '🔒 Đã ẩn mật khẩu. Hỏi lại bot nếu cần xem lại.'; }
+    });
   }
   scrollEnd();
 }
@@ -237,7 +232,7 @@ async function send() {
   files.forEach(f => fd.append('files', f, f.name));
   try {
     const r = await api('/api/chat', { method: 'POST', body: fd, onSlow: () => { const w = $('#wait'); if (w) w.textContent = 'Bot đang khởi động hoặc xử lý file lớn, vui lòng chờ'; } });
-    st.msgs.push({ role: 'bot', text: r.text, files: r.files });
+    st.msgs.push({ role: 'bot', text: r.text, files: r.files, hide_after: r.hide_after || 0 });
     afterReply(r.conversation_id, text || files[0]?.name);
   } catch (e) {
     st.msgs.push({ role: 'bot', error: true, text: e.message });
@@ -343,6 +338,27 @@ function formModal() {
     st.files = []; renderChips();
     pushAction(`📎 Phát hành biểu mẫu: ${file.name}`, r);
   });
+}
+
+async function staffImport() {
+  const file = st.files[0];
+  if (!file) return;
+  if (!window.confirm(`Nạp danh sách nhân sự từ "${file.name}"?\n\n` +
+    '• Cập nhật nhân sự, vai trò, dự án và email đăng nhập web.\n' +
+    '• Mật khẩu (nếu có) được mã hoá; không lưu mật khẩu tài khoản quản trị.\n' +
+    '• File bị xoá khỏi máy chủ ngay sau khi đọc.')) return;
+  const fd = new FormData();
+  fd.append('file', file, file.name);
+  if (st.conv) fd.append('conversation_id', st.conv);
+  st.files = []; renderChips();
+  st.msgs.push({ role: 'user', text: `📎 Nạp danh sách nhân sự: ${file.name}` });
+  renderThread();
+  try {
+    const r = await api('/api/admin/staff-import', { method: 'POST', body: fd });
+    st.msgs.push({ role: 'bot', text: r.text });
+    renderThread();
+    afterReply(r.conversation_id, `Nạp danh sách nhân sự: ${file.name}`);
+  } catch (e) { alertMsg(e.message); }
 }
 
 function pushAction(userText, r) {

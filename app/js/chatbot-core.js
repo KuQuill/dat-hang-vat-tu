@@ -93,21 +93,26 @@ export function filesHtml(files) {
   }).join('') + '</div>';
 }
 
-/** Màn hình liên kết tài khoản web ↔ Telegram (mã 6 số / deep link). */
-export function linkCardHtml(state) {
-  if (!state) {
-    return `<div class="mkb-link">
-      <p><strong>Liên kết tài khoản</strong></p>
-      <p>Để bot biết bạn là ai và có quyền gì, hãy liên kết tài khoản web với Telegram của bạn (làm 1 lần).</p>
-      <button class="btn primary" data-mkb="link-start">Lấy mã liên kết</button></div>`;
-  }
-  const bot = state.bot_username;
-  const deep = bot ? `https://t.me/${encodeURIComponent(bot)}?start=lk${encodeURIComponent(state.code)}` : '';
+/** Email đăng nhập chưa có trong danh sách nhân sự của bot. */
+export function notStaffHtml(me) {
   return `<div class="mkb-link">
-    <p><strong>Mã liên kết của bạn</strong> (hết hạn sau 10 phút)</p>
-    <div class="mkb-code">${esc(state.code)}</div>
-    ${deep ? `<p><a class="btn primary" href="${esc(deep)}" target="_blank" rel="noopener">Mở Telegram và bấm Start</a></p>
-      <p class="muted small">Hoặc nhắn riêng cho @${esc(bot)}: <code>/lienket ${esc(state.code)}</code></p>`
-      : `<p>Nhắn riêng cho bot trên Telegram: <code>/lienket ${esc(state.code)}</code></p>`}
-    <button class="btn" data-mkb="link-check">Tôi đã gửi mã</button></div>`;
+    <p><strong>Chưa có trong danh sách nhân sự của bot</strong></p>
+    <p>Email <code>${esc(me && me.email)}</code> chưa được khai báo. Liên hệ admin để được thêm vào danh sách nhân sự.</p></div>`;
+}
+
+/** Tin nhắn chứa mật khẩu: tự thay nội dung sau `seconds` giây. */
+export function autoHide(el, seconds) {
+  if (!el || !seconds) return;
+  const bubble = el.querySelector('.mkb-bubble');
+  if (bubble) bubble.insertAdjacentHTML('beforeend', `<div class="mkb-hint" data-countdown>Tự ẩn sau ${seconds} giây</div>`);
+  let left = seconds;
+  const t = setInterval(() => {
+    left -= 1;
+    const c = el.querySelector('[data-countdown]');
+    if (c) c.textContent = `Tự ẩn sau ${left} giây`;
+    if (left <= 0) {
+      clearInterval(t);
+      if (bubble) bubble.innerHTML = '🔒 Đã ẩn mật khẩu. Hỏi lại bot nếu cần xem lại.';
+    }
+  }, 1000);
 }
