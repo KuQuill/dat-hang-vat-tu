@@ -1,0 +1,113 @@
+// Lõi dùng chung cho chatbot (widget góc trang + trang chat quản lý chat.html).
+// Lấy phiên đăng nhập Supabase sẵn có của web vật tư → gọi API bot MekoCons trên Render.
+import { CONFIG } from './config.js';
+
+const NS = 'mkcvt2.' + String(CONFIG.SUPABASE_URL || '').replace(/\W+/g, '') + '.';
+const IS_LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+const qs = new URLSearchParams(location.search);
+
+// Xem thử trên máy (chỉ localhost): ?chatapi=http://127.0.0.1:8080&chatdev=<WEB_DEV_TOKEN>
+const DEV_TOKEN = IS_LOCAL ? (qs.get('chatdev') || sessionStorage.getItem('mkcbot.dev') || '') : '';
+if (DEV_TOKEN) sessionStorage.setItem('mkcbot.dev', DEV_TOKEN);
+const API_OVERRIDE = IS_LOCAL ? (qs.get('chatapi') || sessionStorage.getItem('mkcbot.api') || '') : '';
+if (API_OVERRIDE) sessionStorage.setItem('mkcbot.api', API_OVERRIDE);
+
+export const API_BASE = (API_OVERRIDE || CONFIG.CHATBOT_API || '').replace(/\/$/, '');
+export const ENABLED = !!API_BASE && (!!DEV_TOKEN || (!!CONFIG.SUPABASE_URL && !!CONFIG.SUPABASE_ANON_KEY));
+
+let sb = null;
+function client() {
+  if (sb || !window.supabase || !CONFIG.SUPABASE_URL) return sb;
+  // Dùng chung bộ lưu phiên với ứng dụng chính; KHÔNG tự làm mới token (ứng dụng chính đã làm).
+  sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+    auth: { persistSession: true, autoRefreshToken: false, detectSessionInUrl: false, storageKey: NS + 'auth' },
+  });
+  return sb;
+}
+
+/** Có phiên đăng nhập hay không (kiểm tra nhanh, không gọi mạng). */
+export function hasSession() {
+  if (DEV_TOKEN) return true;
+  try { return !!localStorage.getItem(NS + 'auth'); } catch { return false; }
+}
+
+export async function getToken() {
+  if (DEV_TOKEN) return DEV_TOKEN;
+  const c = client();
+  if (!c) return '';
+  const { data } = await c.auth.getSession();
+  return data.session ? data.session.access_token : '';
+}
+
+export class ApiError extends Error {
+  constructor(status, code, message) { super(message); this.status = status; this.code = code; }
+}
+
+/** Gọi API bot. `body`: FormData | undefined. Tự gắn token đăng nhập. */
+export async function api(path, { method = 'GET', body, onSlow } = {}) {
+  const token = await getToken();
+  if (!token) throw new ApiError(401, 'no_session', 'Bạn cần đăng nhập web vật tư trước.');
+  const slow = onSlow ? setTimeout(onSlow, 6000) : null;
+  let res;
+  try {
+    res = await fetch(API_BASE + path, { method, body, headers: { Authorization: 'Bearer ' + token } });
+  } catch {
+    throw new ApiError(0, 'network', 'Không kết nối được bot (kiểm tra mạng rồi thử lại).');
+  } finally {
+    if (slow) clearTimeout(slow);
+  }
+  let data = null;
+  try { data = await res.json(); } catch { /* không phải JSON */ }
+  if (!res.ok) {
+    const d = (data && data.detail) || {};
+    const msg = typeof d === 'object' ? d.message : String(d);
+    throw new ApiError(res.status, (typeof d === 'object' && d.error) || 'error',
+      msg || (res.status >= 500 ? 'Bot đang gặp sự cố, thử lại sau ít phút.' : 'Yêu cầu không hợp lệ.'));
+  }
+  return data;
+}
+
+export const fileUrl = u => (!u ? '' : /^https?:/.test(u) ? u : API_BASE + u);
+
+export function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/** Markdown rút gọn an toàn: **đậm**, `mã`, link http(s), xuống dòng. Luôn escape trước. */
+export function md(text) {
+  let h = esc(text);
+  h = h.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  h = h.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  h = h.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener noreferrer">$2</a>');
+  return h.replace(/\n/g, '<br>');
+}
+
+export function filesHtml(files) {
+  if (!files || !files.length) return '';
+  return '<div class="mkb-files">' + files.map(f => {
+    const main = f.url
+      ? `<a class="mkb-file" href="${esc(fileUrl(f.url))}" target="_blank" rel="noopener">📄 ${esc(f.name)}</a>`
+      : `<span class="mkb-file off" title="File không còn trên máy chủ">📄 ${esc(f.name)}</span>`;
+    const drive = f.drive_link ? ` <a class="mkb-drive" href="${esc(f.drive_link)}" target="_blank" rel="noopener">Drive ↗</a>` : '';
+    return `<div>${main}${drive}</div>`;
+  }).join('') + '</div>';
+}
+
+/** Màn hình liên kết tài khoản web ↔ Telegram (mã 6 số / deep link). */
+export function linkCardHtml(state) {
+  if (!state) {
+    return `<div class="mkb-link">
+      <p><strong>Liên kết tài khoản</strong></p>
+      <p>Để bot biết bạn là ai và có quyền gì, hãy liên kết tài khoản web với Telegram của bạn (làm 1 lần).</p>
+      <button class="btn primary" data-mkb="link-start">Lấy mã liên kết</button></div>`;
+  }
+  const bot = state.bot_username;
+  const deep = bot ? `https://t.me/${encodeURIComponent(bot)}?start=lk${encodeURIComponent(state.code)}` : '';
+  return `<div class="mkb-link">
+    <p><strong>Mã liên kết của bạn</strong> (hết hạn sau 10 phút)</p>
+    <div class="mkb-code">${esc(state.code)}</div>
+    ${deep ? `<p><a class="btn primary" href="${esc(deep)}" target="_blank" rel="noopener">Mở Telegram và bấm Start</a></p>
+      <p class="muted small">Hoặc nhắn riêng cho @${esc(bot)}: <code>/lienket ${esc(state.code)}</code></p>`
+      : `<p>Nhắn riêng cho bot trên Telegram: <code>/lienket ${esc(state.code)}</code></p>`}
+    <button class="btn" data-mkb="link-check">Tôi đã gửi mã</button></div>`;
+}
