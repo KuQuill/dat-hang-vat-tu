@@ -118,3 +118,21 @@ body:has(.mkb-root:not([hidden])) #toasts{bottom:calc(86px + env(safe-area-inset
   .mkc-suggest{grid-template-columns:1fr}
   .mkc-modal .row2{grid-template-columns:1fr}
 }
+
+/* ---------- nhật ký chat nhân viên (admin) ---------- */
+.mkc-logs-btn{margin:0 12px 8px}
+.mkc-logs-btn.active{background:var(--primary-soft);border-color:var(--primary);color:var(--primary)}
+.mkc-compose-wrap[hidden]{display:none}
+.mkc-logs-bar{display:flex;gap:8px;flex-wrap:wrap}
+.mkc-logs-bar select,.mkc-logs-bar input{padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface)}
+.mkc-logs-bar input{flex:1;min-width:180px}
+.mkc-log{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px}
+.mkc-log.flagged{border-left:4px solid var(--warn)}
+.mkc-log header{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:4px}
+.mkc-log .q{line-height:1.5;overflow-wrap:anywhere}
+.mkc-log .a{display:none;margin-top:6px;padding:8px 10px;background:var(--surface-2);border-radius:8px;line-height:1.5;overflow-wrap:anywhere}
+.mkc-log.open .a{display:block}
+.mkc-flag{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--warn-bg);color:var(--warn)}
+.mkc-flag.f-bi_chan{background:var(--danger-bg);color:var(--danger)}
+.mkc-flag.f-mat_khau{background:var(--info-bg);color:var(--info)}
+.mkc-flag.f-ngoai_so{background:var(--violet-bg);color:var(--violet)}

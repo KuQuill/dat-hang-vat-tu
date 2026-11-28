@@ -55,6 +55,7 @@ function shell() {
     <aside class="mkc-side" aria-label="Hội thoại">
       <div class="mkc-brand"><img src="icons/logo.png" alt=""><div><b>Trợ lý quản lý</b><span>Bot MekoCons</span></div></div>
       <button class="btn primary mkc-new" data-a="new">＋ Hội thoại mới</button>
+      ${st.me.role === 'admin' ? '<button class="btn mkc-logs-btn" data-a="logs">🕵️ Nhật ký chat nhân viên</button>' : ''}
       <nav class="mkc-list" id="convs"></nav>
       <div class="mkc-side-foot">
         <span class="muted">${esc(st.me.full_name || st.me.email)} · ${esc(st.me.role)}</span>
@@ -67,7 +68,7 @@ function shell() {
         <h2 id="title">Hội thoại mới</h2>
       </header>
       <div class="mkc-scroll" id="scroll"><div class="mkc-thread" id="thread" aria-live="polite"></div></div>
-      <div class="mkc-compose-wrap">
+      <div class="mkc-compose-wrap" id="compose-wrap">
         <div class="mkc-compose">
           <div class="mkb-chips" id="chips"></div>
           <div class="mkc-actions" id="file-actions" hidden>
@@ -111,6 +112,9 @@ function onClick(e) {
   else if (a === 'doc') docModal();
   else if (a === 'form') formModal();
   else if (a === 'staff') staffImport();
+  else if (a === 'logs') { showLogs(); closeNav(); }
+  else if (a === 'logs-more') loadLogs(true);
+  else if (a === 'log-toggle') b.closest('.mkc-log').classList.toggle('open');
 }
 function closeNav() { $('.mkc')?.classList.remove('nav-open'); }
 
@@ -172,6 +176,7 @@ function renderThread() {
 function scrollEnd() { const s = $('#scroll'); s.scrollTop = s.scrollHeight; }
 
 function newChat() {
+  exitLogs();
   st.conv = null; st.msgs = [];
   $('#title').textContent = 'Hội thoại mới';
   renderConvs(); renderThread();
@@ -179,6 +184,7 @@ function newChat() {
 }
 
 async function openConv(id) {
+  exitLogs();
   st.conv = id;
   renderConvs();
   const c = st.convs.find(x => x.id === id);
@@ -366,6 +372,77 @@ function pushAction(userText, r) {
   st.msgs.push({ role: 'bot', text: r.text });
   renderThread();
   afterReply(r.conversation_id, userText);
+}
+
+// ------------------------------------------------------------------ nhật ký chat nhân viên (chỉ admin)
+
+const LOG_FLAGS = [['', 'Tất cả'], ['*', 'Chỉ có gắn cờ'], ['ngoai_le', 'Ngoài lề'], ['bi_chan', 'Bị chặn'],
+  ['mat_khau', 'Hỏi mật khẩu'], ['ngoai_so', 'Ngoài danh sách']];
+const CHANNEL_LABEL = { web: 'Web', telegram_private: 'Telegram riêng', telegram_group: 'Nhóm Telegram' };
+const logs = { items: [], total: 0, offset: 0 };
+
+function exitLogs() {
+  st.logsMode = false;
+  const w = $('#compose-wrap');
+  if (w) w.hidden = false;
+  document.querySelector('.mkc-logs-btn')?.classList.remove('active');
+}
+
+async function showLogs() {
+  st.logsMode = true; st.conv = null; renderConvs();
+  $('#compose-wrap').hidden = true;
+  document.querySelector('.mkc-logs-btn')?.classList.add('active');
+  $('#title').textContent = 'Nhật ký chat nhân viên';
+  $('#thread').innerHTML = `
+    <div class="mkc-logs-bar">
+      <select id="lg-user" aria-label="Nhân viên"><option value="">Tất cả nhân viên</option></select>
+      <select id="lg-flag" aria-label="Lọc cờ">${LOG_FLAGS.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
+      <select id="lg-days" aria-label="Khoảng thời gian"><option value="7">7 ngày</option><option value="30" selected>30 ngày</option><option value="90">90 ngày</option><option value="180">180 ngày</option></select>
+      <input id="lg-q" type="search" placeholder="Tìm trong nội dung…" aria-label="Tìm kiếm">
+    </div>
+    <p class="mkb-hint">Mật khẩu không bao giờ được lưu. Nhật ký giữ tối đa 180 ngày.</p>
+    <div id="lg-list"><div class="mkb-typing">Đang tải</div></div>`;
+  try {
+    const users = (await api('/api/admin/chat-logs/users?days=180')).items;
+    $('#lg-user').insertAdjacentHTML('beforeend', users.map(u =>
+      `<option value="${esc(u.telegram_user_id)}">${esc(u.user_name)} · ${u.messages} tin${u.flagged ? ` · ⚠️ ${u.flagged}` : ''}</option>`).join(''));
+  } catch { /* vẫn xem được tất cả */ }
+  let t;
+  ['lg-user', 'lg-flag', 'lg-days'].forEach(id => $('#' + id).addEventListener('change', () => loadLogs()));
+  $('#lg-q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => loadLogs(), 350); });
+  loadLogs();
+}
+
+async function loadLogs(more = false) {
+  if (!more) { logs.items = []; logs.offset = 0; }
+  const flag = $('#lg-flag').value;
+  const p = new URLSearchParams({ days: $('#lg-days').value, limit: '50', offset: String(logs.offset) });
+  if ($('#lg-user').value) p.set('user_id', $('#lg-user').value);
+  if (flag === '*') p.set('flagged_only', 'true'); else if (flag) p.set('flag', flag);
+  if ($('#lg-q').value.trim()) p.set('q', $('#lg-q').value.trim());
+  try {
+    const r = await api('/api/admin/chat-logs?' + p.toString());
+    logs.items.push(...r.items); logs.total = r.total; logs.offset = logs.items.length;
+    renderLogs();
+  } catch (e) { $('#lg-list').innerHTML = `<p class="late-text">${esc(e.message)}</p>`; }
+}
+
+function renderLogs() {
+  const el = $('#lg-list');
+  if (!logs.items.length) { el.innerHTML = '<p class="muted">Không có tin nhắn nào khớp bộ lọc.</p>'; return; }
+  const fmt = iso => new Date(iso).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+  el.innerHTML = `<p class="mkb-hint">${logs.total} lượt hỏi–đáp</p>` + logs.items.map(x => `
+    <article class="mkc-log ${x.flag ? 'flagged' : ''}">
+      <header>
+        <b>${esc(x.user_name || x.telegram_user_id)}</b>
+        <span class="muted small">${esc(fmt(x.time))} · ${esc(CHANNEL_LABEL[x.channel] || x.channel)}${x.project_code ? ' · ' + esc(x.project_code) : ''}</span>
+        ${x.flag ? `<span class="mkc-flag f-${esc(x.flag)}">${esc(x.flag_label)}</span>` : ''}
+      </header>
+      <div class="q">${md(x.user_text || '(chỉ gửi file)')}${x.attachments ? `<div class="mkb-hint">📎 ${esc(x.attachments)}</div>` : ''}</div>
+      <button class="btn sm ghost" data-a="log-toggle">Câu trả lời của bot</button>
+      <div class="a">${md(x.bot_text)}<div class="mkb-hint">Xử lý: ${esc(x.handled_by)}</div></div>
+    </article>`).join('') +
+    (logs.items.length < logs.total ? '<p><button class="btn" data-a="logs-more">Xem thêm</button></p>' : '');
 }
 
 boot();
